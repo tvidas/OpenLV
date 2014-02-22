@@ -1,0 +1,43 @@
+Windows Registry Editor Version 5.00
+
+;Credit: Michael A Penhallurick of Cranfield University
+
+[HKEY_LOCAL_MACHINE\NEWSYSTEM\ControlSet001\Control\CriticalDeviceDatabase\pci#ven_8086&dev_1222]
+"ClassGUID"="{4D36E96A-E325-11CE-BFC1-08002BE10318}"
+"Service"="intelide"
+
+[HKEY_LOCAL_MACHINE\NEWSYSTEM\ControlSet001\Control\CriticalDeviceDatabase\pci#ven_8086&dev_1230]
+"ClassGUID"="{4D36E96A-E325-11CE-BFC1-08002BE10318}"
+"Service"="intelide"
+
+[HKEY_LOCAL_MACHINE\NEWSYSTEM\ControlSet001\Control\CriticalDeviceDatabase\pci#ven_8086&dev_2411]
+"ClassGUID"="{4D36E96A-E325-11CE-BFC1-08002BE10318}"
+"Service"="intelide"
+
+[HKEY_LOCAL_MACHINE\NEWSYSTEM\ControlSet001\Control\CriticalDeviceDatabase\pci#ven_8086&dev_2421]
+"ClassGUID"="{4D36E96A-E325-11CE-BFC1-08002BE10318}"
+"Service"="intelide"
+
+[HKEY_LOCAL_MACHINE\NEWSYSTEM\ControlSet001\Control\CriticalDeviceDatabase\pci#ven_8086&dev_7010]
+"ClassGUID"="{4D36E96A-E325-11CE-BFC1-08002BE10318}"
+"Service"="intelide"
+
+[HKEY_LOCAL_MACHINE\NEWSYSTEM\ControlSet001\Control\CriticalDeviceDatabase\pci#ven_8086&dev_7111]
+"ClassGUID"="{4D36E96A-E325-11CE-BFC1-08002BE10318}"
+"Service"="intelide"
+
+[HKEY_LOCAL_MACHINE\NEWSYSTEM\ControlSet001\Control\CriticalDeviceDatabase\pci#ven_8086&dev_7199]
+"ClassGUID"="{4D36E96A-E325-11CE-BFC1-08002BE10318}"
+"Service"="intelide"
+
+;Add driver for intelide (requires intelide.sys in drivers directory)
+
+[HKEY_LOCAL_MACHINE\NEWSYSTEM\ControlSet001\Services\IntelIde]
+"ErrorControl"=dword:00000001
+"Group"="System Bus Extender"
+"Start"=dword:00000000
+"Tag"=dword:00000004
+"Type"=dword:00000001
+"ImagePath"=hex(2):53,00,79,00,73,00,74,00,65,00,6d,00,33,00,32,00,5c,00,44,00,\
+52,00,49,00,56,00,45,00,52,00,53,00,5c,00,69,00,6e,00,74,00,65,00,6c,00,69,\
+00,64,00,65,00,2e,00,73,00,79,00,73,00,00,00
