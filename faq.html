@@ -1,0 +1,32 @@
+{% include header.html %}
+      <section>
+        <h3>
+<a name="welcome-to-openlv" class="anchor" href="#welcome-to-openlv"><span class="octicon octicon-link"></span></a>Welcome to OpenLV.</h3>
+
+<p>OpenLV is a Java-based graphical forensics tool that creates a virtual machine out of a raw (dd-style) disk image or physical disk. This allows the forensic examiner to "boot up" the image or disk and gain an interactive, user-level perspective of the environment, all without modifying the underlying image or disk. Because all changes made to the disk are written to a separate file, the examiner can instantly revert all of his or her changes back to the original pristine state of the disk. The end result is that one need not create extra "throw away" copies of the disk or image to create the virtual machine.</p>
+
+<h4>
+<a name="openlv-is-capable-of-booting" class="anchor" href="#openlv-is-capable-of-booting"><span class="octicon octicon-link"></span></a>OpenLV is capable of booting</h4>
+
+<ul>
+<li>Full disk raw images</li>
+<li>Bootable partition raw images</li>
+<li>Physical Disks (attached via a USB or Firewire bridge)</li>
+<li>Specialized and closed image formats (using 3rd party image mounting software)</li>
+<li>Containing the following operating systems
+
+<ul>
+<li>Windows (7, 2008, Vista, 2003, XP, 2000, NT, Me, 98)</li>
+<li>Linux (limited support)</li>
+</ul>
+</li>
+</ul><h4>
+<a name="openlv-is-compatible-with-on-windows-or-linux-examination-machines0" class="anchor" href="#openlv-is-compatible-with-on-windows-or-linux-examination-machines0"><span class="octicon octicon-link"></span></a>OpenLV is compatible with (on Windows or Linux examination machines0</h4>
+
+<ul>
+<li>VirtualBox</li>
+<li>VMware Workstation</li>
+<li>VMware Server (1.x only)</li>
+</ul><p>Behind the scenes, Live View automates a wide array of technical tasks. Some of these include: resolving hardware conflicts resulting from booting on hardware other than that on which the OS was originally installed; creating a customized MBR for partition-only images; and correctly specifying a virtual disk to match the original image or physical disk.</p>
+      </section>
+{% include footer.html %}
