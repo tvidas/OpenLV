@@ -1,5 +1,7 @@
 /*
    LiveViewLauncher
+   Law Enforcement Edition  #####Gov#####
+   Limited Distribution     #####Gov#####
 
    Copyright (C) 2006-2008 Carnegie Mellon University
 
@@ -29,6 +31,7 @@ import java.io.*;
 import javax.swing.*;
 
 import cert.forensics.mbr.MasterBootRecord;
+import cert.forensics.registry.RegistryParser;   /*#####Gov#####*/
 import java.awt.*;
 import java.awt.event.*;
 
@@ -41,9 +44,12 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.nio.channels.FileChannel;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.Properties;
 import java.util.*;
+import java.util.zip.*;
 
 
 /**
@@ -59,26 +65,33 @@ import java.util.*;
  *  - Mounted images with the aid of mounting software such as Mount Image Pro
  *  - Split dd style images
  *  - VMware Workstation or Free VMware Server
- *  
- * It allows you to:
+ *                        
+ * It allows you to:      
  *  - Specify the system time (set to time of seizure)
+ *  - Dump the sam/system/security hives for password cracking (windows only) #####Gov#####
+ *  - Dump the sam and mscash password hashes for password cracking (windows only) #####Gov#####
+ *  - Blank out all user account passwords on the system (windows only) #####Gov#####
  *  - Continue working with your changes or start form scratch
  *  - Generate only the configuration files (user launches vmx manually) or automate the launch
- *  
+ *                        
  * It also makes the necessary changes (installing a vmware compatible intel driver) to XP/2K 
  * systems to correct the 0x7B bluescreen issue when booting up a system installed on non-intel 
- * hardware
- * 
+ * hardware               
+ *                        
  * The Main Live View Class that launches the GUI, validates input, builds the config files, makes 
  * modifications to VM redo, launches the VM, etc 
  * @author Tim Vidas
  * @author Brian Kaplan
- * @version 0.7, Jan 2009
+ * @version 0.8Beta, Dec 2009
  */
 
 public class LiveViewLauncher 
 {   
+    private static String      	     jarFile = "LiveViewPublic.jar";
+    private static final String      PermLogFile = "LiveView.log";
+    private static final String      TempLogFile = "MostRecentRun.log";
     public  static final String      endL = System.getProperty("line.separator");
+    private static LogWriter         myLogWriter = new LogWriter(TempLogFile,PermLogFile);
 
     private static final JTextArea   messageOutputArea = new JTextArea();   //program output area
     private static SwingWorker       worker;   
@@ -92,28 +105,56 @@ public class LiveViewLauncher
     private static boolean           startWasClicked     = false;   //keeps track of whether launch button was clicked or not
 
     private static final String      MOUNT_DRIVE_LETTER  = getNextFreeDriveLetter('k');   //get next free drive letter for mounting   
+    private static final String      VMWARE_REG_PATH     = getVMWareRegPath();      //get reg path for VMWare reg or WOW64
     private static int               vmWareInstallType   ;  //pushed to later on, so there aren't any errors during instantiation
 
     private static boolean           isVMWareServer      ;  //pushed to later on, so there aren't any errors during instantiation
     private static String            VMWARE_VMRUN_PATH   ; //pushed to later du to isVMWareServer move = getVMWareVMRunPath(isVMWareServer);      //path to vmrun executable
     private static final String      VMWARE_MOUNT_PATH   = queryRegistryForVDDKVMMountPath();
-    private static final double      JVM_MINIMUM_REQ     = 1.5;         //requires jvm 1.5 or higher
-    private static final long        BYTES_PER_GIG       = 1073741824;   //2^30 bytes per gig
+    private static final double      JVM_MINIMUM_REQ     = 1.6;         //requires jvm 1.6 or higher
+    public static final long         BYTES_PER_GIG       = 1073741824;   //2^30 bytes per gig
+    public static final long         BYTES_PER_MB        = 1048576;
+
+    private static String            thisComputerVMWare   = null;
+    private static String            thisComputerRAM      = null;
+    private static String            thisComputerOS       = null;
+    private static String            thisComputerSP       = null;
+    private static String            thisComputerArch     = null;
+    private static String            thisComputerJava     = null;
 
     //these should really be in a seperate 'include' file that this class 'implements'
-    public static final int verWorkstationOld = 3;
-    public static final int verWorkstation = 0;
-    public static final int verServerOne   = 1;
-    public static final int verServerTwo   = 2;
-    public static final int verError       = -1;
+    public static final int          verWorkstationOld = 3;
+    public static final int          verWorkstation = 0;
+    public static final int          verServerOne   = 1;
+    public static final int          verServerTwo   = 2;
+    public static final int          verError       = -1;
+    public static String             dataDisks      = "";
+
+    public static final String       FORMAT = "MMM dd yyyy HH:mm:ss z";
+    public static final SimpleDateFormat formatter = new SimpleDateFormat(FORMAT);
+
+    private static String            confFile = System.getProperty("user.home") + "\\LiveView.ini";   //use user's home directory
+    private static ExternalConfigStrings ecs = new ExternalConfigStrings(confFile);
+    private static final boolean     enableAdvanced = (getConfString("EnableAdvancedFeatures").equalsIgnoreCase("true"))? true : false;
+    private static final String      MAX_PHYS_DRIVE_NUM_STR = getConfString("MaxPhysicalDrives");
+    private static ArrayList<DiskData> ddList = new ArrayList<DiskData>(); 
+
+    public static String	     FILE_SEP_STRING = ",   ";  //used to seperate file names, particularly in multi file input (eg split/chunked images)
+
 
     /**
      * the main funtion is what spins LiveView up
      */
     public static void main(String args[])
     {       
-        LogWriter.log(InternalConfigStrings.getString("LiveViewLauncher.TitleBarText"));
-        LogWriter.log("Host Operating System: " + System.getProperty("os.name"));
+        jarFile = "LiveViewGovernment.jar";  // #####Gov#####
+        myLogWriter.log(InternalConfigStrings.getString("LiveViewLauncher.TitleBarText"));
+	thisComputerOS = System.getProperty("os.name");
+	thisComputerSP = System.getProperty("os.version");
+	thisComputerArch = System.getProperty("os.arch");
+        myLogWriter.log("Host Operating System: " + thisComputerOS + " " + thisComputerSP);
+
+        FILE_SEP_STRING = getConfString("FileSeperator"); //allow user to specify the file seperator used in the GUI disk image selection box
 
         //JFrame.setDefaultLookAndFeelDecorated(true);   //Java style GUI
 
@@ -138,6 +179,7 @@ public class LiveViewLauncher
         //maximize to user specified percentage of screen
         int percentWidth  = Integer.parseInt(InternalConfigStrings.getString("LiveViewLauncher.PercentageOfScreenWidth"));
         int percentHeight = Integer.parseInt(InternalConfigStrings.getString("LiveViewLauncher.PercentageOfScreenHeight"));
+        percentHeight+=2;   /*#####Gov#####*/   //this is added to correct the difference in GUI size resulting from removing password/hive functionality
 
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
 
@@ -163,36 +205,42 @@ public class LiveViewLauncher
         /* RAM Field */
         final JTextField sizeRamField = new JTextField();
         sizeRamField.setColumns(7);   //set text field width
-        sizeRamField.setText(InternalConfigStrings.getString("LiveViewLauncher.DefaultRamSize"));
+        sizeRamField.setText(getConfString("DefaultRamSize"));
         sizeRamField.setToolTipText(InternalConfigStrings.getString("LiveViewLauncher.ToolTipRamSize"));
 
         /* RAM Size Label */
         final JLabel sizeRamLabel = new JLabel(InternalConfigStrings.getString("LiveViewLauncher.RamSizeLabel")); 
 
-        JPanel sizeRamPanel = new JPanel(new BorderLayout(0,0));
+        JPanel sizeRamPanel = new JPanel(new GridLayout(3,0));
         sizeRamPanel.add(sizeRamLabel);   //add label
         sizeRamPanel.add(sizeRamField,BorderLayout.SOUTH);      //add text field
 
         /* System Time Field */
         final JTextField systemTimeField = new JTextField();
         systemTimeField.setColumns(20);   //set text field width
-        //       if(InternalConfigStrings.getString("LiveViewLauncher.DefaultSystemTime").compareTo("<NOW>") == 0)   //if user specifies <NOW> use current date/time as default sys time
-        //       {
-        //          DateFormat df = DateFormat.getDateTimeInstance();
-        ////          DateFormat df = new SimpleDateFormat(dateFormat);
-        //          String formattedDate = null;
-        //
-        //          formattedDate = df.format(now);
-        //
-        //          systemTimeField.setText(formattedDate);
-        //       }
-        //       else
-        //          systemTimeField.setText(InternalConfigStrings.getString("LiveViewLauncher.DefaultSystemTime"));
-
-        DateFormat df = DateFormat.getDateTimeInstance();
+       // DateFormat df = DateFormat.getDateTimeInstance();
         String formattedDate = null;
-        formattedDate = df.format(now);
-        systemTimeField.setText(formattedDate);
+        //String FORMAT = "MMM dd yyyy HH:mm:ss z";
+        //SimpleDateFormat formatter = new SimpleDateFormat(FORMAT);
+               if(getConfString("DefaultSystemTime").compareTo("<NOW>") == 0)   //if user specifies <NOW> use current date/time as default sys time
+               {
+                 formattedDate = formatter.format(now);
+                 //formattedDate = df.format(now);
+        
+               }
+               else
+		{
+			formattedDate = getConfString("DefaultSystemTime");
+		       postOutput("Using Custom Configured Time value");
+		  }
+	    
+	  systemTimeField.setText(InternalConfigStrings.getString("LiveViewLauncher.DefaultSystemTime"));
+	  systemTimeField.setText(formattedDate);
+
+        //DateFormat df = DateFormat.getDateTimeInstance();
+        //String formattedDate = null;
+        //formattedDate = df.format(now);
+        //systemTimeField.setText(formattedDate);
 
         systemTimeField.setToolTipText(InternalConfigStrings.getString("LiveViewLauncher.ToolTipSystemTime"));
 
@@ -200,10 +248,62 @@ public class LiveViewLauncher
         final JLabel systemTimeLabel = new JLabel(InternalConfigStrings.getString("LiveViewLauncher.SystemTimeLabel")); 
 
         /* System Time Group (Panel) */
-        JPanel systemTimePanel = new JPanel(new BorderLayout(0,0));
+        JPanel systemTimePanel = new JPanel(new GridLayout(3,0));
         systemTimePanel.add(systemTimeLabel);   //add label
         systemTimePanel.add(systemTimeField,BorderLayout.SOUTH);      //add text field
 
+        /*##########start-gov##########*/
+        /* Checkbox for Clear Local Login Passwords */
+        final JCheckBox clearPWBox = new JCheckBox(InternalConfigStrings.getString("LiveViewLauncher.ClearPasswordLabel"));    
+        if(getConfString("DefaultClearPassword").equalsIgnoreCase("true"))             
+        {                                                                                        
+            //clearPWBox.setEnabled(true);                                                                
+            clearPWBox.setSelected(true);                                                                
+        }                                                                                        
+        else                                                                                     
+        {                                                                                        
+            //clearPWBox.setEnabled(false);   //grayed out                                                    
+            clearPWBox.setSelected(false);                                                                
+        }                                                                                        
+        clearPWBox.setToolTipText(InternalConfigStrings.getString("LiveViewLauncher.ToolTipClearPassword"));                   
+
+        /* Checkbox for Clear Cached Domain Creds */
+        final JCheckBox clearDomainPWBox = new JCheckBox(InternalConfigStrings.getString("LiveViewLauncher.ClearDomainPasswordLabel"));    
+        if(getConfString("DefaultClearDomainPassword").equalsIgnoreCase("true") && enableAdvanced)             
+        {                                                                                        
+            //clearDomainPWBox.setEnabled(true);                                                                
+            clearDomainPWBox.setSelected(true);                                                                
+        }                                                                                        
+        else                                                                                     
+        {                                                                                        
+            //clearDomainPWBox.setEnabled(false);   //grayed out                                                    
+            clearDomainPWBox.setSelected(false);                                                                
+        }                                                                                        
+        clearDomainPWBox.setToolTipText(InternalConfigStrings.getString("LiveViewLauncher.ToolTipClearDomainPassword"));                   
+
+        /* Checkbox Dumping SAM File */       
+        final JCheckBox dumpSAMBox = new JCheckBox(InternalConfigStrings.getString("LiveViewLauncher.DumpHivesLabel"));    
+        if(getConfString("DefaultDumpHives").equalsIgnoreCase("true"))   //based on default value    
+        {                            
+            //dumpSAMBox.setEnabled(true);    
+            dumpSAMBox.setSelected(true);    
+        }                            
+        else                         
+        {                            
+            //dumpSAMBox.setEnabled(false);   //grayed out    
+            dumpSAMBox.setSelected(false);                
+        }                            
+
+        dumpSAMBox.setToolTipText(InternalConfigStrings.getString("LiveViewLauncher.ToolTipDumpHives"));    
+
+        /* Put the two check boxes (clear pw and dump sam) in their own panel */    
+        JPanel samPanel = new JPanel(new GridLayout(3,0));    
+        samPanel.add(clearPWBox);   //add label       
+        samPanel.add(dumpSAMBox);//,BorderLayout.NORTH);      //add text field    
+	if(enableAdvanced){
+	samPanel.add(clearDomainPWBox);//,BorderLayout.SOUTH);
+	}
+        /*##########end-gov##########*/   
 
         /* OS Selection Combo Box */
         //map the user displayed OS choice vals to the vmware guest os values 
@@ -220,16 +320,62 @@ public class LiveViewLauncher
             osSelectionCombo.addItem(cbItem);
         }
         osSelectionCombo.setSelectedIndex(0);   //default value is the first value
+	//osSelectionCombo.setPreferredSize(new Dimension(outPtSize+5,outPtSize+5));
         osSelectionCombo.setToolTipText(InternalConfigStrings.getString("LiveViewLauncher.ToolTipOSSelection"));
 
         /* OS Selection Label */
         final JLabel osSelectionLabel = new JLabel(InternalConfigStrings.getString("LiveViewLauncher.OSSelectionLabel"));
+	//osSelectionLabel.setPreferredSize(new Dimension(outPtSize+5,outPtSize+5));
+        final JLabel osSelectionDummy = new JLabel(" ");
 
         /* OS Selection Group (Panel) */
-        JPanel osSelectionPanel = new JPanel(new BorderLayout(0,0));
+        JPanel osSelectionPanel = new JPanel(new GridLayout(3,0));
         osSelectionPanel.add(osSelectionLabel);      //add label
-        osSelectionPanel.add(osSelectionCombo,BorderLayout.SOUTH);      //add combo box
+        osSelectionPanel.add(osSelectionCombo);      //add combo box
+        osSelectionPanel.add(osSelectionDummy);      //add combo box
 
+        /*##########start-gov##########*/
+        //listener that enables/disables the clear password and dump sam checkbox based on OS    
+        osSelectionCombo.addActionListener(new ActionListener()           
+                {                                                 
+		    public void actionPerformed(ActionEvent e)                 
+			{                                              
+			    JComboBox cb = (JComboBox)e.getSource();             
+			    String osString = (String)((ComboBoxItem)cb.getSelectedItem()).getUnderlyingValue();   
+
+			    if(!osString.equals("auto") &&
+				OperatingSystem.getBaseOS(osString).compareTo("unknown") == 0 ||     
+				OperatingSystem.getBaseOS(osString).compareTo("nt") == 0 ||          
+				OperatingSystem.getBaseOS(osString).compareTo("98") == 0 ||           
+				OperatingSystem.getBaseOS(osString).compareTo("me") == 0)   //any os where clear passwords/dump sam is not supported    
+			    {
+				clearPWBox.setEnabled(false);   //grayed out       
+				clearPWBox.setSelected(false);                   
+				dumpSAMBox.setEnabled(false);                   
+				dumpSAMBox.setSelected(false);                   
+			    } else
+			    {                                           
+			        clearPWBox.setEnabled(true);                   
+			        clearPWBox.setSelected(true);                   
+			        dumpSAMBox.setEnabled(true);                   
+			        dumpSAMBox.setSelected(true);                   
+			    }                                           
+			    if(osString.equals("auto") || 
+				OperatingSystem.getBaseOS(osString).compareTo("nt") == 0 ||     
+				OperatingSystem.getBaseOS(osString).compareTo("2k") == 0 ||     
+				OperatingSystem.getBaseOS(osString).compareTo("xp") == 0 ||     
+				OperatingSystem.getBaseOS(osString).compareTo("2003") == 0 )
+			    {
+				clearDomainPWBox.setEnabled(true);  
+				clearDomainPWBox.setSelected(true);                   
+			    }else{
+				clearDomainPWBox.setEnabled(false);  
+				clearDomainPWBox.setSelected(false);                   
+			    }
+			}                                              
+		}
+	);                                                 
+        /*##########end-gov##########*/       
 
         /* Radio Buttons for Generate Configs Only vs Generate and Launch VM */
         final JRadioButton generateAndLaunch    = new JRadioButton("Launch My Image",true); //default choice
@@ -260,10 +406,10 @@ public class LiveViewLauncher
         final JTextField directoryField = new JTextField();
         directoryField.setColumns(30);
 
-        if(InternalConfigStrings.getString("LiveViewLauncher.DefaultOutputDirectory").compareTo("<HOME>") == 0)   //if properties file specifies "<HOME>"
+        if(getConfString("DefaultOutputDirectory").compareTo("<HOME>") == 0)   //if properties file specifies "<HOME>"
             directoryField.setText(System.getProperty("user.home"));   //use user's home directory
         else
-            directoryField.setText(InternalConfigStrings.getString("LiveViewLauncher.DefaultOutputDirectory"));   //use dir specified in properties file
+            directoryField.setText(getConfString("DefaultOutputDirectory"));   //use dir specified in properties file
 
         directoryField.setToolTipText(InternalConfigStrings.getString("LiveViewLauncher.ToolTipOutputDirectory"));
 
@@ -340,7 +486,7 @@ public class LiveViewLauncher
                 {
                     fNameBuf.append(inFiles[i].getCanonicalPath());
                     if( i != inFiles.length - 1)
-                        fNameBuf.append(", ");
+                        fNameBuf.append(FILE_SEP_STRING); //made adjustable because some users had ", " in the path - eg by name:  c:\people\Vidas, Tim\diskImage.001
                     inputFileField.setText(inFiles[i].getCanonicalPath());   //write the path in the text field
                 }
                 else
@@ -496,14 +642,15 @@ public class LiveViewLauncher
                 }
             }
 
-//            DisplayBetaWarning(frame);
+            DisplayBetaWarning(frame);
 
             /* Check that the user has an up to date JVM >= global var JVM_MINIMUM_REQ */
             String javaVersion = System.getProperty("java.version", "0.0");
+	    thisComputerJava = javaVersion;
 
             String jvmBaseVersion = javaVersion.substring(0,javaVersion.indexOf(".") + 2);   //version string including one digit after the decimal eg 1.5
             double jvmBaseVersionNum = Double.parseDouble(jvmBaseVersion);
-            LogWriter.log("Java Version: " + jvmBaseVersion);
+            myLogWriter.log("Java Version: " + jvmBaseVersion);
             if (jvmBaseVersionNum < JVM_MINIMUM_REQ)   //if JVM doesnt meet minimum requirements, alert user
             {
                 Object[] options = {"Okay"};   //button text
@@ -523,9 +670,10 @@ public class LiveViewLauncher
             }
 
             vmWareInstallType   = getVMWareVersion();      //is the user using vmware server or vmware workstation
+	    thisComputerVMWare = thisComputerVMWare + "(" + vmWareInstallType + ")";
             isVMWareServer      = (vmWareInstallType == verServerOne || vmWareInstallType == verServerTwo)? true : false; 
             VMWARE_VMRUN_PATH   = getVMWareVMRunPath(isVMWareServer);      //path to vmrun executable
-            LogWriter.log("VMWare Install Type: " + vmWareInstallType);
+            myLogWriter.log("VMWare Install Type: " + vmWareInstallType);
             /* Check that Some Version of VMWare is installed */
             if (vmWareInstallType == verError ||   //if no vmware install (workstation or server) detected
                     vmWareInstallType == verServerTwo) //VMWare Server 2.x is not supported 
@@ -568,14 +716,14 @@ public class LiveViewLauncher
 
                 if(answer == JOptionPane.OK_OPTION)  //user clicked OK button
                 {
-                    LogWriter.log("Prompted 5.5+ check, user accepted.");
+                    myLogWriter.log("Prompted 5.5+ check, user accepted.");
                 } else if (answer == JOptionPane.CLOSED_OPTION){
                     //what about the escape key?!  answer is -1 (CLOSED_OPTION
                     System.exit(1);      //exit program
                 }
             }
 */  
-            LogWriter.log("VMWare Mount Path: " + VMWARE_MOUNT_PATH);
+            myLogWriter.log("VMWare Mount Path: " + VMWARE_MOUNT_PATH);
             if (VMWARE_MOUNT_PATH == null)   //if no vmware-mount is detected
             {
                 Object[] options = {"Okay"};   //button titles
@@ -617,7 +765,7 @@ public class LiveViewLauncher
                 if(answer == JOptionPane.OK_OPTION)  //user clicked OK button
                 {
                     //System.exit(1);      //exit program
-                    LogWriter.log("user was warned about old verions of vmware-mount installed.  continuing...");
+                    myLogWriter.log("user was warned about old verions of vmware-mount installed.  continuing...");
                 }
             }
 
@@ -636,16 +784,26 @@ public class LiveViewLauncher
                     final String    mode            = modeGroup.getSelection().getActionCommand();   //generate | generate and launch
 
                     final String   bootSource         = bootSourceType.getSelection().getActionCommand();   //ImageFile | PhysicalDisk
+                    /*##########start-gov##########*/
+                    final boolean    clearPasswords      = clearPWBox.isSelected();      //blank out login passwords             
+                    final boolean    clearDomainPasswords      = clearDomainPWBox.isSelected();      //blank out cached domain passwords             
+                    final boolean    dumpHives         = dumpSAMBox.isSelected();      //dump sam/system hives to output dir    
+                    myLogWriter.log("Clear Passwords: " + clearPasswords);
+                    myLogWriter.log("Clear cached domain: " + clearDomainPasswords);
+                    myLogWriter.log("Dump Hives: " + dumpHives); 
+                    /*##########end-gov##########*/
                     final String    diskSize         = PARENT_DISK_SIZE_GB;         
 
                     long totalSectorsOnParentDisk = 0;         //sectors on disk image
 
                     final boolean isPhysicalDisk = bootSource.equalsIgnoreCase("PhysicalDisk") ? true : false;   //is the user booting a physical disk or a dd image
 
-                    LogWriter.log("Ram Size: " + sizeRamText);
-                    LogWriter.log("System Time: " + systemTimeText); 
-                    LogWriter.log("Guest OS: " + guestOSTypeText);
-                    LogWriter.log("Is Physical Disk: " + isPhysicalDisk);
+                    myLogWriter.log("Ram Size: " + sizeRamText);
+                    myLogWriter.log("System Time: " + systemTimeText); 
+		    //postOutput("System Time value" + systemTimeText);
+
+                    myLogWriter.log("Guest OS: " + guestOSTypeText);
+                    myLogWriter.log("Is Physical Disk: " + isPhysicalDisk);
 
                     final String physicalDiskName;
                     final String physicalDiskModel;
@@ -675,28 +833,43 @@ public class LiveViewLauncher
                     };
                     SwingUtilities.invokeLater(updateStartButtonState);
 
-                    DateFormat formatter = DateFormat.getDateTimeInstance();//new SimpleDateFormat(dateFormat);
+                    //DateFormat formatter = DateFormat.getDateTimeInstance();//new SimpleDateFormat(dateFormat);
                     Date date = null;
 
                     try
                     {
                         try
                         {
-                            date = (Date)formatter.parse(systemTimeText);   //is user sys time input in proper format
+                            //date = (Date)formatter.parse(systemTimeText);   //is user sys time input in proper format
+                            date = formatter.parse(systemTimeText);   //is user sys time input in proper format
+			    //postOutput("\ndate is" + date.getTime() + "\n");
                         }
                         catch(ParseException pe)
                         {
-                            throw new LiveViewException("Invalid Date Format Entered: " + pe.getMessage() + endL + "Date Should Be In Format: " + formatter.toString());
+                            throw new LiveViewException("Invalid Date Format Entered: " + pe.getMessage() + endL + "Date Should Be In Format: " + FORMAT);
                         }
-                        final long userSysTimeSince1970 = date.getTime() / 1000;    //user specified seconds since January 1, 1970, 00:00:00 GMT
+//                        final long userSysTimeSince1970 = date.getTime() / 1000;    //user specified seconds since January 1, 1970, 00:00:00 GMT
+/*		 	SimpleDateFormat sdf = new SimpleDateFormat("MMM dd yyyy HH:mm:ss z");
+			Date realDate = null;
+			try{
+		            realDate = sdf.parse("Dec 08 1979 23:10:00 CST");// should be 313521600
+                        }
+                        catch(ParseException pe)
+                        {
+                            throw new LiveViewException("Invalid Date Format Entered: " + pe.getMessage() + endL + "Date Should Be In Format: " + FORMAT);
+                        }
+			final long userSysTimeSince1970 = realDate.getTime();
+		    postOutput("\nusersystimesince1970 " + userSysTimeSince1970 + "\n");
+*/
+			final long userSysTimeSince1970 = date.getTime() / 1000;
                         final long currentSysTimeSince1970 = now.getTime() / 1000;   //current secs since Jan 1, 1970
 
                         final String outDirVal   = directoryField.getText().trim();   //user specified output directory
 
-                        final String[] pathForInputFiles = inputFileField.getText().trim().split("\\s*,\\s*");   //extract array of input file paths
+                        final String[] pathForInputFiles = inputFileField.getText().trim().split("\\s*" + FILE_SEP_STRING + "\\s*");   //extract array of input file paths
 
                         sortChunkFileNamesByExtension(pathForInputFiles);   //sort the file extensions so they can be concatenated in order
-                        LogWriter.log("Sorted Input Files " + Arrays.toString(pathForInputFiles));
+                        myLogWriter.log("Sorted Input Files " + Arrays.toString(pathForInputFiles));
 
                         final boolean isChunked;
                         if(pathForInputFiles.length == 1)
@@ -761,7 +934,7 @@ public class LiveViewLauncher
                         //postOutput("vmware-mount at" + VMWARE_MOUNT_PATH + endL );
 
                         //check if the config file location for the vmrun executable is valid
-                        LogWriter.log("vmrun path: " + VMWARE_VMRUN_PATH);
+                        myLogWriter.log("vmrun path: " + VMWARE_VMRUN_PATH);
                         File tempCheckVMRun = new File(VMWARE_VMRUN_PATH);
                         if(!tempCheckVMRun.exists())
                         {
@@ -769,7 +942,7 @@ public class LiveViewLauncher
                         }
 
                         //make sure the mount drive letter is not already mounted from a previous run that did not properly clean up
-                        LogWriter.log("Mount Drive Letter: " + MOUNT_DRIVE_LETTER);
+                        myLogWriter.log("Mount Drive Letter: " + MOUNT_DRIVE_LETTER);
                         String mountDriveLetter = MOUNT_DRIVE_LETTER; 
                         File testMountDriveLetter = new File(mountDriveLetter + ":");
                         if(testMountDriveLetter.isDirectory())
@@ -812,7 +985,7 @@ public class LiveViewLauncher
                             {
                                 if(!imgFiles[i].exists())
                                 {
-                                    throw new LiveViewException("The image file: " + imgFiles[i].getName() + " could not be found");
+                                    throw new LiveViewException("The image file: " + imgFiles[i].getName() + " could not be found" + imgFiles[i].getAbsolutePath());
                                 }
                             }
 
@@ -870,7 +1043,7 @@ public class LiveViewLauncher
                         }
                         else   //we almost certainly have an mbr or a partition (not a garbage file)
                         {
-                            LogWriter.log("MBR Signature found: almost certainly have an mbr or partition (not garbagefile)");
+                            myLogWriter.log("MBR Signature found: almost certainly have an mbr or partition (not garbagefile)");
                         }
 
                         //sanity check on user's image file selection
@@ -899,7 +1072,7 @@ public class LiveViewLauncher
                                 if(imgFiles[i].canWrite())
                                 {
                                     writable = true;
-                                    LogWriter.log("Writable File: " + imgFiles[i]);
+                                    myLogWriter.log("Writable File: " + imgFiles[i]);
                                 }
                             }
 
@@ -922,9 +1095,28 @@ public class LiveViewLauncher
                                     postOutput("Making image file(s) read-only at user's request" + endL);
                                 }      
                                 else
-                                    LogWriter.log("User chose not to make image files read-only");
+                                    myLogWriter.log("User chose not to make image files read-only");
                             }
                         }
+
+			//create secondary vmdks
+			System.err.println("\n\n Creating secondary disks....\n");
+
+			Iterator it=ddList.iterator();
+			while(it.hasNext())
+			{
+				int i = 0;
+				DiskData currentDisk = (DiskData)it.next();
+				
+				postOutput("processing data disk " + i++ + ": " + currentDisk + "\n");
+
+				File fullOutVMDKPath = new File(testDir.getAbsolutePath().trim() + System.getProperty("file.separator"));// + outFileVMDKName;   //vmdk config
+				currentDisk.createVMDKfile(fullOutVMDKPath);
+
+			}
+			//DDTODO
+
+			//end secondary vmdks
 
                         /* Create the output files (vmx and vmdk) in the output directory (same base name as the image file)*/
                         String outFileVMXName          = imageName + ".vmx";
@@ -944,7 +1136,7 @@ public class LiveViewLauncher
                         else
                             numExistingSnapshots = 0;
 
-                        LogWriter.log("Num Existing Snapshots " + numExistingSnapshots);
+                        myLogWriter.log("Num Existing Snapshots " + numExistingSnapshots);
 
                         if(numExistingSnapshots == -1)   //error detecting snapshots
                         {
@@ -988,14 +1180,14 @@ public class LiveViewLauncher
                                             {
                                                 if(imgFiles[n].getName().compareTo(fName) == 0)   //file name matches one of the image files itself (we dont want to delete those)
                                                 {
-                                                    LogWriter.log("Skipped: " + fName);
+                                                    myLogWriter.log("Skipped: " + fName);
                                                     dontDelete = true;
                                                 }
                                             }
                                         }
                                         if(!dontDelete)   //if current file in dir is not one of the image files
                                         {
-                                            LogWriter.log("Deleted: " + fName);
+                                            myLogWriter.log("Deleted: " + fName);
                                             filesInDir[i].delete();   //delete it
                                         }
                                     }
@@ -1021,7 +1213,7 @@ public class LiveViewLauncher
                             {
                                 sizeOfPartition += imgFiles[i].length();
                             }
-                            LogWriter.log("Size of partition (bytes): " + sizeOfPartition);
+                            myLogWriter.log("Size of partition (bytes): " + sizeOfPartition);
 
                             //we cannot autodetect the os for partition images (because there is no MBR)
                             if(guestOSTypeText.equals("auto"))
@@ -1038,12 +1230,12 @@ public class LiveViewLauncher
                             if(guestOSTypeText.equals("win98") || guestOSTypeText.equals("winMe"))   //win 98 or Me
                             {
                                 genericMBR = new File(InternalConfigStrings.getString("LiveViewLauncher.GenericMBRLocationW98Me"));
-                                LogWriter.log("Using Generic Windows MBR for 98/Me");   
+                                myLogWriter.log("Using Generic Windows MBR for 98/Me");   
                             }
                             else                     //non-win98/Me  //TODO linux???
                             {
                                 genericMBR = new File(InternalConfigStrings.getString("LiveViewLauncher.GenericMBRLocation"));
-                                LogWriter.log("Using Generic Windows MBR for non-win98/me");
+                                myLogWriter.log("Using Generic Windows MBR for non-win98/me");
                             }
 
                             //mbr file based on the image file name with .mbr appended to it
@@ -1075,8 +1267,8 @@ public class LiveViewLauncher
                                 fsType = "OTHER";
                         }
 
-                        LogWriter.log("MBR Info:");
-                        LogWriter.log(mbr.toString());   //log MBR contents to file
+                        myLogWriter.log("MBR Info:");
+                        myLogWriter.log(mbr.toString());   //log MBR contents to file
 
                         if(!guestOSTypeText.equals("auto"))   //if the user selected the OS
                         {
@@ -1095,7 +1287,7 @@ public class LiveViewLauncher
                                 try   //no, so create it
                                 {  
                                     outVMXFile.createNewFile();   //create the file
-                                    LogWriter.log("Created: " + outVMXFile.getAbsolutePath());
+                                    myLogWriter.log("Created: " + outVMXFile.getAbsolutePath());
 
                                 }
                                 catch(IOException ioe)
@@ -1139,18 +1331,83 @@ public class LiveViewLauncher
                                 vmxBuffer.append("ide1:0.present = \"TRUE\"" + endL);
                                 vmxBuffer.append("ide1:0.fileName = \"auto detect\"" + endL);
                                 vmxBuffer.append("ide1:0.deviceType = \"cdrom-raw\"" + endL);
+				int disksAdded = 2;  //two IDE slots taken (main disk and cdrom) each primary on ide channel 0 and 1 respectively
+						     //this could obviously be a 2d array, or a class, etc, but there are only 4 values so just simple...
+
+				//need to process all data disks  TODO FIXME
+
+				Iterator dit=ddList.iterator();
+				int scsiid = 0;
+				while(dit.hasNext())
+				{
+					int i = 0;
+					int channel = 0;
+					int devid = 0;
+					DiskData currentDisk = (DiskData)dit.next();
+					String deviceTypeString = "ide";
+					
+					postOutput("adding data disk " + i++ + " to VM...\n");
+					if(disksAdded < 4)  //disks 0-3 added as IDE
+					{
+						deviceTypeString = "ide";
+					}
+					else
+					{
+						deviceTypeString = "scsi";
+					}
+					if(disksAdded == 2){
+						channel = 0;
+						devid = 1;
+					}
+					else if(disksAdded == 3){
+						channel = 1;
+						devid = 1;
+					}
+					else if(disksAdded >= 4){
+						channel = 0;
+						devid = 1;
+					}
+					else {
+						channel = 0;		//TODO how many scsi devices available per channel?  do i need to skip id 7?
+						devid = scsiid++;
+					}
+
+					vmxBuffer.append(endL);
+
+					vmxBuffer.append("#Data Disk " + i + endL);
+					vmxBuffer.append(deviceTypeString + channel + ":" + devid +".present = \"TRUE\"" + endL);
+					String outVMDKPath = currentDisk.getFilename();
+
+					if(numExistingSnapshots > 0 && answerContStartOver == JOptionPane.YES_OPTION)   //if snapshots exist already and the user wants to Continue with what they were working on, point the filename to the snapshot
+					    vmxBuffer.append(deviceTypeString + channel + ":" + devid +".fileName = \"" + outVMDKPath.substring(0,outVMDKPath.length()-5).concat("-000001.vmdk") + "\"" + endL);
+					else                     //otherwise point the filename to the regualar vmdk
+					    vmxBuffer.append(deviceTypeString + channel + ":" + devid +".fileName = \"" + outVMDKPath + "\"" + endL);
+
+					vmxBuffer.append(deviceTypeString + channel + ":" + devid +".deviceType = \"disk\"" + endL);
+					vmxBuffer.append(deviceTypeString + channel + ":" + devid +".mode = \"persistent\"" + endL);
+
+					disksAdded++;
+
+
+					//File fullOutVMDKPath = new File(testDir.getAbsolutePath().trim() + System.getProperty("file.separator"));// + outFileVMDKName;   //vmdk config
+					//currentDisk.createVMDKfile(fullOutVMDKPath);
+
+				}
 
                                 vmxBuffer.append(endL);
 
                                 vmxBuffer.append("#User Specified" + endL);
                                 vmxBuffer.append("memsize=\"" + sizeRamText + "\"" + endL);
                                 vmxBuffer.append("rtc.starttime=\"" + userSysTimeSince1970 + "\"" + endL);
+                                //postOutput("rtc.starttime=\"" + userSysTimeSince1970 + "\"" + endL);
                                 vmxBuffer.append("tools.syncTime=\"FALSE\"" + endL);
                                 vmxBuffer.append("time.syncronized.continue=\"FALSE\"" + endL);
                                 vmxBuffer.append("time.syncronized.restore=\"FALSE\"" + endL);
                                 vmxBuffer.append("time.syncronized.resume.disk=\"FALSE\"" + endL);
                                 vmxBuffer.append("time.syncronized.resume.memory=\"FALSE\"" + endL);
                                 vmxBuffer.append("time.syncronized.shrink=\"FALSE\"" + endL);
+                                vmxBuffer.append("time.syncronized.tools.startup=\"FALSE\"" + endL);
+                                vmxBuffer.append("isolation.tools.setOption.disable=\"TRUE\"" + endL);
 
                                 if(!guestOSTypeText.equals("auto"))   //if the user chose an OS manually from dropdown (not auto detect)
                                     vmxBuffer.append("guestOS=\"" + guestOSTypeText + "\"" + endL);
@@ -1158,7 +1415,7 @@ public class LiveViewLauncher
                                 if(!isVMWareServer)   //disable snapshots on vmware workstation to prevent accidental modification of original image -- vmware server does not have the snapshot tree so only necessary for workstation
                                     vmxBuffer.append("snapshot.disabled = \"TRUE\"");
 
-                                LogWriter.log(vmxBuffer.toString() + endL + endL );   //log the contents of the vmx
+                                myLogWriter.log(vmxBuffer.toString() + endL + endL );   //log the contents of the vmx
                                 vmxWriter.write(vmxBuffer.toString());   //write the buffer to the vmx file
 
                             }
@@ -1178,7 +1435,7 @@ public class LiveViewLauncher
                                 try   //no, so create the file
                                 {  
                                     outVMDKFile.createNewFile();   //create the file
-                                    LogWriter.log("Created: " + outVMDKFile.getAbsolutePath());
+                                    myLogWriter.log("Created: " + outVMDKFile.getAbsolutePath());
                                 }
                                 catch(IOException ioe)
                                 {
@@ -1285,7 +1542,7 @@ public class LiveViewLauncher
                                 vmdkBuffer.append("ddb.geometry.cylinders = \"" + mbr.largestCylinderValOnDisk() + "\"" + endL);
                                 vmdkBuffer.append("ddb.virtualHWVersion = \"3\"" + endL);
 
-                                LogWriter.log(vmdkBuffer.toString());
+                                myLogWriter.log(vmdkBuffer.toString());
                                 vmdkWriter.write(vmdkBuffer.toString());   //write the vmdk buffer to the file
                             }
                             catch(IOException ioe)
@@ -1308,81 +1565,90 @@ public class LiveViewLauncher
                             public Object construct() 
                             {
                                 boolean prepWorked = true; //did preparation for vm launch work
+				boolean gotAtLeastOneOS = false;
 
                                 String mountDriveLetter = MOUNT_DRIVE_LETTER; 
                                 int bootablePartitionIndex = mbr.getBootablePartitionIndex();
 
-                                OperatingSystem os = null;
+                                OperatingSystem[] osArr = {null,null,null,null};
                                 if(numExistingSnapshots == 0 || startFromScratch)   //no snapshots already created or user chose to start from scratch
                                 {
                                     //TODO prepare all bootable partitions for launch (check each of the four entries)
 
                                     //prepare the bootable partition for launch
-                                    os = prepareVMForLaunch(fullOutVMXPath, fullOutVMDKPath, mountDriveLetter, 
+                                    osArr = prepareVMForLaunch(fullOutVMXPath, fullOutVMDKPath, mountDriveLetter, 
                                             guestOSTypeText, fileSysType, isFullDisk, bootablePartitionIndex,
-                                            testDir.getAbsolutePath().trim(), imageName);
+                                            clearPasswords, clearDomainPasswords, dumpHives, /*#####Gov#####*/ 
+                                            testDir.getAbsolutePath().trim(), imageName, frame);
 
-                                    if(os != null)
-                                    {
-                                        guestOSTypeText = os.getVmGuestOS();
-                                        postOutput("Bootable Partition " + bootablePartitionIndex + ": " + guestOSTypeText + " prepared for launch" + endL);
-                                    }
-                                    else
-                                    {
-                                        postError("Problem preparing partition" + bootablePartitionIndex + " for launch");
-                                        prepWorked = false;
-                                    }
+			            for(int part =1; part <=4 ; part++){
+					    if(osArr[part-1] != null)
+					    {
+						guestOSTypeText = osArr[part-1].getVmGuestOS();
+						gotAtLeastOneOS = true;
 
-                                    //get find first nt partition on the disk (if there is one)
-                                    int ntPartitionIndex = bootablePartitionIndex;
+					    //get find first nt partition on the disk (if there is one)
+					    //int ntPartitionIndex = bootablePartitionIndex;
 
-                                    //write the nt drive serial number to the customized mbr from above
-                                    if(!isFullDisk && OperatingSystem.isNTKernel(guestOSTypeText)) //dealing with just an NTKernel partition 
-                                    {
-                                        int[] ntDriveSerialNum = {0x00, 0x00, 0x00, 0x00}; //generic 4 byte serial for non nt systems (those done require serial numbers)
+					    //write the nt drive serial number to the customized mbr from above
+					    if(!isFullDisk && OperatingSystem.isNTKernel(guestOSTypeText)) //dealing with just an NTKernel partition 
+					    {
+						int[] ntDriveSerialNum = {0x00, 0x00, 0x00, 0x00}; //generic 4 byte serial for non nt systems (those done require serial numbers)
 
-                                        if(ntPartitionIndex > 0)   //if os is nt based (but not Original NT)
-                                        {
-                                            String vmdkSnapshotLoc = fullOutVMDKPath.substring(0,fullOutVMDKPath.length()-5).concat("-000001.vmdk");   //xyz.vmdk -> xyz-000001.vmdk  (snapshot naming convention)
-                                            LogWriter.log("Snapshot Location: " + vmdkSnapshotLoc);
+						if(osArr[part-1].getPartitionID() - 1 > 0)   //if os is nt based (but not Original NT)
+						{
+						    String vmdkSnapshotLoc = fullOutVMDKPath.substring(0,fullOutVMDKPath.length()-5).concat("-000001.vmdk");   //xyz.vmdk -> xyz-000001.vmdk  (snapshot naming convention)
+						    myLogWriter.log("Snapshot Location: " + vmdkSnapshotLoc);
 
-                                            if(startFromScratch)   //if user wants to start from scratch
-                                                ntDriveSerialNum = getNTDriveSerialNum(vmdkSnapshotLoc, false, os, ntPartitionIndex);   //get the NT drive serial number
-                                            else
-                                                ntDriveSerialNum = getNTDriveSerialNum(vmdkSnapshotLoc, true, os, ntPartitionIndex);   //get the NT drive serial number
+						    if(startFromScratch)   //if user wants to start from scratch
+							ntDriveSerialNum = getNTDriveSerialNum(vmdkSnapshotLoc, false, osArr[part-1], osArr[part-1].getPartitionID()-1);   //get the NT drive serial number
+							//ntDriveSerialNum = getNTDriveSerialNum(vmdkSnapshotLoc, false, osArr[part-1], ntPartitionIndex);   //get the NT drive serial number
+						    else
+							ntDriveSerialNum = getNTDriveSerialNum(vmdkSnapshotLoc, true, osArr[part-1], osArr[part-1].getPartitionID()-1);   //get the NT drive serial number
 
-                                            LogWriter.log("Drive Serial Number: " + Arrays.toString(ntDriveSerialNum));
+						    myLogWriter.log("Drive Serial Number: " + Arrays.toString(ntDriveSerialNum));
 
-                                        }
+						}
 
-                                        if(ntDriveSerialNum != null)   //if we got the 4 byte serial number, write it to the mbr
-                                        {
-                                            try 
-                                            {
-                                                RandomAccessFile raf = new RandomAccessFile(custMBR, "rw");
-                                                LogWriter.log("MBR File: " + custMBR.getName() + " opened r/w");
+						if(ntDriveSerialNum != null)   //if we got the 4 byte serial number, write it to the mbr
+						{
+						    try 
+						    {
+							RandomAccessFile raf = new RandomAccessFile(custMBR, "rw");
+							myLogWriter.log("MBR File: " + custMBR.getName() + " opened r/w");
 
-                                                //serial number starts at byte 440, so skip to there and write the 4 byte serial
-                                                raf.seek(440);   
-                                                raf.write(ntDriveSerialNum[0]);    
-                                                raf.seek(441);
-                                                raf.write(ntDriveSerialNum[1]); 
-                                                raf.seek(442);
-                                                raf.write(ntDriveSerialNum[2]); 
-                                                raf.seek(443);
-                                                raf.write(ntDriveSerialNum[3]);
+							//serial number starts at byte 440, so skip to there and write the 4 byte serial
+							raf.seek(440);   
+							raf.write(ntDriveSerialNum[0]);    
+							raf.seek(441);
+							raf.write(ntDriveSerialNum[1]); 
+							raf.seek(442);
+							raf.write(ntDriveSerialNum[2]); 
+							raf.seek(443);
+							raf.write(ntDriveSerialNum[3]);
 
-                                                raf.close();
-                                                postOutput("Custom MBR For Partition Generated Successfully" + endL);
-                                            } 
-                                            catch (IOException ioe) 
-                                            {
-                                                postError("I/O error while writing nt drive serial number to custom mbr: " + ioe.getMessage());
-                                            }
-                                        }
-                                        else   //error retrieving drive serial
-                                            prepWorked = false;
-                                    }
+							raf.close();
+							postOutput("Custom MBR For Partition Generated Successfully" + endL);
+						    } 
+						    catch (IOException ioe) 
+						    {
+							postError("I/O error while writing nt drive serial number to custom mbr: " + ioe.getMessage());
+						    }
+						}
+						else   //error retrieving drive serial
+						    prepWorked = false;
+					    }
+					}
+				    }
+				    if(gotAtLeastOneOS){
+			        	postOutput("VM prepared for launch.  (bootpartition: " + bootablePartitionIndex + ")" + endL);
+			            }
+			            else
+			            {
+				        postError("Problem preparing VM." + endL);
+				        prepWorked = false;
+			            }
+				    
                                 }   
                                 else if(numExistingSnapshots == 1)   //user wants to continue with existing snapshot
                                 {
@@ -1488,11 +1754,11 @@ public class LiveViewLauncher
                     {
                         public void windowClosing(WindowEvent e) 
             {
-                LogWriter.log("User Closed Program Window");
+                myLogWriter.log("User Closed Program Window");
                 stopProc();
-                LogWriter.log("Stopped running processes");
+                myLogWriter.log("Stopped running processes");
                 cleanUp();
-                LogWriter.log("Cleaned Up");
+                myLogWriter.log("Cleaned Up");
                 System.exit(0);
             }
             });
@@ -1525,6 +1791,7 @@ public class LiveViewLauncher
             inputPanelTop.add(sizeRamPanel);
             inputPanelTop.add(systemTimePanel);
             inputPanelTop.add(osSelectionPanel);
+            inputPanelTop.add(samPanel);   /*#####Gov#####*/ 
 
             JPanel inputPanel = new JPanel(new BorderLayout(0,0));
             inputPanel.add(inputPanelTop);      //all regular input
@@ -1550,6 +1817,10 @@ public class LiveViewLauncher
             JMenu fileMenu = new JMenu("File");      //file menu is the main menu
             fileMenu.setMnemonic(KeyEvent.VK_F);   //allow for alt-f to access file menu
 
+
+            JMenu helpMenu = new JMenu("Help");
+            JMenu advancedMenu = new JMenu("Edit");
+
             //set up the actions sub menu
             JMenu actionsSubMenu = new JMenu("Actions");
             startItem.addActionListener(startAListener);
@@ -1568,13 +1839,179 @@ public class LiveViewLauncher
             {
                 public void run() 
             {
-                JOptionPane.showMessageDialog(frame,InternalConfigStrings.getString("LiveViewLauncher.AboutBoxText"),"About This Program",JOptionPane.INFORMATION_MESSAGE);
+
+		    Long installedMemoryAmount = getInstalledMemory();
+		    thisComputerRAM = "" + installedMemoryAmount/1024/1024;
+		    final String thisComputerVersion = //getSystemProps() +
+			   "\nDetected host properties:" +
+			   "\nVMWare: " + thisComputerVMWare + 
+			   "\nRAM:    " + thisComputerRAM + "+ MB"+
+			   "\nOS:     " + thisComputerOS  + " " + thisComputerSP +
+			   "\nArch:   " + thisComputerArch +
+			   "\nJava:   " + System.getProperty("java.vendor") + " " + thisComputerJava +
+			   "\nJVM:    " + System.getProperty("java.vm.vendor") + " " + System.getProperty("java.vm.version");
+
+                String AboutText = InternalConfigStrings.getString("LiveViewLauncher.AboutBoxText") + thisComputerVersion;
+                JOptionPane.showMessageDialog(frame,AboutText,"About This Program",JOptionPane.INFORMATION_MESSAGE);
             }
             };
             SwingUtilities.invokeLater(doShowAboutDialog);
             }
             });
-            fileMenu.add(aboutMenuItem);
+            helpMenu.add(aboutMenuItem);
+
+            JMenuItem helpPackMenuItem = new JMenuItem("CreateHelpArchive");
+            helpPackMenuItem.addActionListener(new ActionListener()
+                    {
+                        public void actionPerformed(ActionEvent e)
+            {
+                Runnable doShowHelpPackDialog = new Runnable() 
+            {
+                public void run() 
+            {
+		String[] filenames = new String[]{
+			PermLogFile, 
+		    	TempLogFile,
+		    	jarFile,
+		        confFile
+			};
+
+		byte[] buf = new byte[1024];
+	        ZipFileMenu zfm = new ZipFileMenu(frame,new File("c:\\"));  //TODO FIXME needs to be non-constant (should be outDirVal probably)
+	        ZipData myZipData = zfm.showDialog();
+	        if(myZipData.isValid())
+	        {
+			/*
+		    postOutput("Select zip output dir: \n" + myZipData + "\n");
+		    postOutput("Select zip Contact Name : \n" + myZipData.getContactName() + "\n");
+		    postOutput("Select zip Email : \n" + myZipData.getContactEmail() + "\n");
+		    postOutput("Select zip Message: \n" + myZipData.getHelpMessage() + "\n");
+		    */
+
+
+			try {
+			    Long installedMemoryAmount = getInstalledMemory();
+			    thisComputerRAM = "" + installedMemoryAmount/1024/1024;
+			    final String thisComputerVersion = //getSystemProps() +
+				   "\nDetected host properties:" +
+				   "\nVMWare: " + thisComputerVMWare + 
+				   "\nRAM:    " + thisComputerRAM + "+ MB"+
+				   "\nOS:     " + thisComputerOS  + " " + thisComputerSP +
+				   "\nArch:   " + thisComputerArch +
+				   "\nJava:   " + System.getProperty("java.vendor") + " " + thisComputerJava +
+				   "\nJVM:    " + System.getProperty("java.vm.vendor") + " " + System.getProperty("java.vm.version");
+
+			    String outFilename = "HelpArchive.zip";
+			    File outFile = new File(myZipData.getFilePath(),outFilename);
+			    try{
+				    if(outFile.exists()){
+				      Object[] options = {"Okay","Cancel"};   //button titles
+					    int answer = JOptionPane.showOptionDialog(frame, 
+						    "A help file exists at the location you specified, if you continue that file will be overwritten!" + endL +
+						    "Are you sure you want to continue?",
+						    "Are you sure!?",
+						    JOptionPane.OK_OPTION,
+						    JOptionPane.ERROR_MESSAGE,
+						    null,              //no custom icon
+						    options,           //the titles of buttons
+						    options[0]);       //default button title
+
+					    if(answer != JOptionPane.OK_OPTION)   //user clicked ok button
+					    {
+						return ;
+					    }
+
+				    }
+			    }catch(Exception e){
+				    postError("zip file output check failure: " + e.getMessage());
+			    }
+			
+
+			    ZipOutputStream out = new ZipOutputStream(new FileOutputStream(outFile));
+
+			    for (int i=0; i<filenames.length; i++) {
+				FileInputStream in = new FileInputStream(filenames[i]);
+
+				// this is done so that the full path isn't embedded in the zip
+				File tempFile = new File(filenames[i]);
+				String zipEntName = tempFile.getName();
+
+				ZipEntry zEnt = new ZipEntry(zipEntName);
+				//zEnt.setTime()
+				out.putNextEntry(zEnt);
+
+				int len;
+				while ((len = in.read(buf)) > 0) {
+				    out.write(buf, 0, len);
+				}
+				out.closeEntry();
+				in.close();
+
+			    }
+			   out.putNextEntry(new ZipEntry("metainfo"));
+			   out.write(("created: " + formatter.format(new Date()) + endL).getBytes());
+			   out.write(("Name: " + myZipData.getContactName() + endL).getBytes());
+			   out.write(("Email: " + myZipData.getContactEmail() + endL).getBytes());
+			   out.write(("Help: " + myZipData.getHelpMessage() + endL).getBytes());
+			   out.write(thisComputerVersion.getBytes());
+			   out.closeEntry();
+
+
+			    out.close(); //close the zip file
+			} catch (IOException e) {
+				postError("zip file creation failed" + e.getMessage());
+			}
+			postOutput("zip file created at " + myZipData.getFilePath());
+			JOptionPane.showMessageDialog(frame,"File created!","Help Archive Created",JOptionPane.INFORMATION_MESSAGE);
+	        }
+	        else
+	        {
+		    postOutput("Zip data provided is invalid\n");
+	        }
+		    
+
+            }
+            };
+            SwingUtilities.invokeLater(doShowHelpPackDialog);
+            }
+            });
+            helpMenu.add(helpPackMenuItem);
+
+	    if(Desktop.isDesktopSupported()){
+		    final Desktop desktop = Desktop.getDesktop();
+		    if(desktop.isSupported(Desktop.Action.EDIT)){
+            /* Edit Config File*/
+            JMenuItem editMenuItem = new JMenuItem("Configure");
+            editMenuItem.addActionListener(new ActionListener()
+                    {
+                        public void actionPerformed(ActionEvent e)
+            {
+		    File file = new File(confFile);
+		    if(!file.exists()){
+			    try{
+				    postError("file not found, creating " + confFile + "...");
+				    file.createNewFile();
+				    FileOutputStream out = new FileOutputStream(file);
+				    PrintStream p = new PrintStream(out);
+				    p.println(ConfText.theText);
+				    out.close();
+			    }
+			    catch(Exception exc){
+				postError("Unable to create file. \n" + exc.toString());
+			    }
+		    }
+		    try {
+			    desktop.edit(file);  //reload items XXXX
+		    }
+		    catch(Exception exc){
+			postError("Unable To Launch Editor. Try Editing it manually in your user home directory. \n" + exc.toString());
+		    }
+            }   
+            });
+            fileMenu.add(editMenuItem);
+		    }
+	    }
+
 
             /* Help Menu Item */
             JMenuItem helpMenuItem = new JMenuItem("Help");
@@ -1586,7 +2023,7 @@ public class LiveViewLauncher
                 postError("Unable To Launch Help Document. Try Opening it Manually From The Live View Installation Directory.");
             }   
             });
-            fileMenu.add(helpMenuItem);
+            helpMenu.add(helpMenuItem);
 
             /* Separator */
             fileMenu.addSeparator();   
@@ -1605,7 +2042,45 @@ public class LiveViewLauncher
 
             fileMenu.add(exitMenuItem);
 
+	    JMenuItem secondaryDiskMenuItem = new JMenuItem("Add Data Disk");
+	    secondaryDiskMenuItem.addActionListener(new ActionListener()
+		    {
+			    public void actionPerformed(ActionEvent e)
+	    {
+		    //JFrame win = new SecondaryDiskMenu(frame);
+		    SecondaryDiskMenu sdm = new SecondaryDiskMenu(frame,new File("c:\\"));  //TODO FIXME needs to be non-constant (should be outDirVal probably)
+		    DiskData myDisk = sdm.showDialog();
+		    if(myDisk.isValid())
+		    {
+			    postOutput("Added secondary data disk: \n" + myDisk + "\n");
+			    ddList.add(myDisk);
+		    }
+		    else
+		    {
+			    postOutput("no disk added\n");
+		    }
+
+
+		    /*
+		    System.err.println("HH" + s + "HH");
+		    if(s.equals("") || s.equals("ImageFile: [Select Your Image File(s)]"))
+		    {
+			    postOutput("no disk added\n");
+		    }
+		    else
+		    {
+			    postOutput("Added secondary data disk: \n" + s + "\n");
+		    }
+		    */
+		    //XXXX
+	    }
+	    });
+
+	    advancedMenu.add(secondaryDiskMenuItem);
+
             menuBar.add(fileMenu);         //add the file menu to the menu bar
+            menuBar.add(advancedMenu);
+            menuBar.add(helpMenu);
 
             frame.setJMenuBar(menuBar);   //add the menu bar to the frame
             frame.pack();
@@ -1627,15 +2102,32 @@ public class LiveViewLauncher
          *  @param userChosenGuestOS the OS the use selected from the GUI (or auto)
          *  @param fsType the file system type of the partition
          *  @param partitionIndex the partition on the disk to prepare for booting
+         *  @param clearPasswords true if passwords are desired to be blanked   #####Gov#####
+         *  @param clearDomainPasswords true if cached domain passwords are desired to be blanked   #####Gov#####
+         *  @param dumpHives true if the registry hives are desired to be dumped   #####Gov#####
          *  @param outputDir the path to create files in (such as a snapshot)
          *  @param baseFileName used for determining the filename of the snapshot file(s)
          *  @return the OperatingSystem instance for partition 'partitionIndex' in the image
          */
-        private static OperatingSystem prepareVMForLaunch(   String vmxLoc, String vmdkLoc, String mountDriveLetter, 
-                String userChosenGuestOS, String fsType, boolean isFullDisk, int partitionIndex,
-                String outputDir, String baseFileName)
+        private static OperatingSystem[] prepareVMForLaunch(   String vmxLoc, String vmdkLoc, String mountDriveLetter, 
+                String userChosenGuestOS, String fsType, boolean isFullDisk, int partitionIndexIn,
+                boolean clearPasswords, boolean clearDomainPasswords, boolean dumpHives,  /*#####Gov#####*/
+                //boolean clearPasswords, boolean dumpHives, /*#####Gov#####*/
+                String outputDir, String baseFileName, JFrame frame)
         {
             boolean autoDetect = userChosenGuestOS.equals("auto");   //did user select auto detect os
+	    int partitionIndex = partitionIndexIn;
+	    myLogWriter.log("prepareVMForLaunch called with: \n\t" +
+				vmxLoc + "\n\t" +
+				vmdkLoc + "\n\t" +
+				mountDriveLetter + "\n\t" +
+				userChosenGuestOS + "\n\t" +
+				fsType + "\n\t" +
+				isFullDisk + "\n\t" +
+				partitionIndex + "\n\t" +
+				outputDir + "\n\t" +
+				baseFileName + "\n\t" +
+				"\n");
 
             if(isVMWareServer)
             {
@@ -1666,14 +2158,43 @@ public class LiveViewLauncher
             String osProductName;
 
             //create os variable for the current image
-            OperatingSystem os = null;
+            //OperatingSystem os = null;
+	    OperatingSystem[] tempos = {null,null,null,null};
 
             try
             {
                 if(autoDetect)
-                    os = new OperatingSystem(mountDriveLetter, vmdkSnapshotLoc, partitionIndex, fsType, "auto");   //creat os and auto detect
-                else
-                    os = new OperatingSystem(mountDriveLetter, vmdkSnapshotLoc, partitionIndex, fsType, userChosenGuestOS);   //create os with user defined val
+		    for(int part=1; part <= 4; part++){ 
+			    tempos[part-1] = null;
+			    //tempos = new OperatingSystem(mountDriveLetter, vmdkSnapshotLoc, partitionIndex, fsType, "auto");   //creat os and auto detect
+                            postOutput("Autodetecting on partition" + part +"..........\n");
+			    try{
+			        tempos[part-1] = new OperatingSystem(mountDriveLetter, vmdkSnapshotLoc, part, fsType, "auto");   //creat os and auto detect
+			    }
+			    catch(LiveViewException lve){
+				postError(lve.getMessage());
+				tempos[part-1] = null;
+			    }
+				if(unmountSnapshot(mountDriveLetter, false))   //unmount the snapshot for image from local machine FS
+				{
+				    myLogWriter.log("Snapshot Unmounted" + endL);
+				}
+				else
+				{
+				    postError("Snapshot Unmount Failed");
+					if(unmountSnapshot(mountDriveLetter, false))   //unmount the snapshot for image from local machine FS
+					{
+					    myLogWriter.log("Snapshot forcibly Unmounted" + endL);
+					}else{
+					    myLogWriter.log("Snapshot not Unmounted" + endL);
+					    getNextFreeDriveLetter(mountDriveLetter.charAt(0));
+					    myLogWriter.log("changing mountDriverLetter to " + mountDriveLetter);
+					}
+				}    
+		    }
+                else{
+                    tempos[partitionIndex] = new OperatingSystem(mountDriveLetter, vmdkSnapshotLoc, partitionIndex, fsType, userChosenGuestOS);   //create os with user defined val
+		}
             }
             catch(LiveViewException lve)
             {
@@ -1682,229 +2203,368 @@ public class LiveViewLauncher
                 return null;
                 //return false;   
             }
+	        
+	    //heuristic for deciding which partition is the "important" one, on multi-boot partitions... TODO
+	    //even though we can 'fixup' them all, only one type can be suggested in the VMX 
+	    //TODO allow user to overide this via GUI
+	    for( int part = 1; part <= 4; part++){
+		    if(tempos[part-1] != null){
+			    partitionIndex = part;
+		    }
+	    }
+	    postOutput("Selected partition" + partitionIndex +":"+tempos[partitionIndex-1].getPublicOSName() + " as VM type" + endL);
+
+	    //fixup ALL partitions that were recognized
+	    for(int part=1; part <= 4; part++){ 
+		OperatingSystem os = null;
+		if(tempos[part-1] != null){
+  		    os = tempos[part-1];
+		    postOutput("Analyzing partition" + part +" (" + os.getPublicOSName() + ") for error conditions..." + endL);
+		    if(os != null){
+			if(!mountSnapshot(mountDriveLetter, vmdkSnapshotLoc, part)){
+			    postOutput("OS mount failed! exiting" + endL);
+			    cleanUp();
+			    return null;
+			}else{
+			    postOutput("partition mounted" + endL);
+			}
+
+		    }else{
+			    postOutput("Valid OS not found! exiting" + endL);
+			    cleanUp();
+			    return null;
+		    }
+
+		    String guestOSVal = null;
+		    if(autoDetect)
+		    {
+			osProductName = os.getPublicOSName();//queryRegistryForOSName(softHiveLoc);
+			if(!osProductName.equalsIgnoreCase("Win9xOrLinux"))   //if not windows 9x or linux
+			{
+			    guestOSVal = os.getVmGuestOS();
+
+			    if(OperatingSystem.getBaseOS(os.getVmGuestOS()).equals("nt"))
+			    {
+				//unmount the snapshot (because it was mounted earlier to detect NT and system dir)
+				if(unmountSnapshot(mountDriveLetter, false))   //unmount the snapshot for image from local machine FS
+				{
+				    postOutput("Snapshot Unmounted" + endL);
+				}
+				else
+				{
+				    postError("Snapshot Unmount Failed");
+				    //return false;
+				    return null;
+				}    
+			    }
+			}
+			else   //win 9x or Linux -- TODO rather than default to "other" try to figure out actual guest os val
+			{
+			    guestOSVal = os.getVmGuestOS();//"other";
+			    osProductName = os.getPublicOSName();//"Windows 9x or Linux";
+
+			    //unmount the snapshot (because it was mounted earlier to detect win9x)
+			    if(unmountSnapshot(mountDriveLetter, false))   //unmount the snapshot for image from local machine FS
+			    {
+				postOutput("Snapshot Unmounted" + endL);
+			    }
+			    else
+			    {
+				postError("Snapshot Unmount Failed");
+				//return false;
+				return null;
+			    }    
+			}
+
+			postOutput("Detected " + osProductName + " installation on image" + endL);
+
+			if(guestOSVal == null)   //no close guest OS match could be found for OS name
+			{
+			    postError("Unknown Operating System: " + osProductName + " Please manually choose the most similar OS from the dropdown and try again");
+			    //return false;
+			    return null;
+			}      
+
+			//add osname to vmx
+			//since this file should only be written once, only perform action on 'primary' OS partition
+			if(part == partitionIndex){
+				DataOutputStream vmxOutStream = null;
+				try
+				{
+				    vmxOutStream = new DataOutputStream(new FileOutputStream(vmxLoc,true));
+				    vmxOutStream.writeBytes("guestOS=\"" + guestOSVal + "\"" + endL);      //append guestOS="<osname>" to vmx file
+				    myLogWriter.log("Added: " + "guestOS=\"" + guestOSVal + "\"" + " to " + vmxLoc);
+				    vmxOutStream.flush();
+				    vmxOutStream.close();
+				    postOutput("Added guest OS (" + guestOSVal + ") to vmx file for Parition (" +part+")" + endL);
+				}
+				catch(IOException ioe)
+				{
+				    postError("Error writing vmx file: " + vmxLoc);
+				    //return false;
+				    return null;
+				}
+			}
+		    }
+		    else   //not auto detect os
+		    {
+			guestOSVal = userChosenGuestOS;
+			osProductName = os.getPublicOSName();
+		    }
+
+		    //if osname chosen is Me,98 or any other that doesnt require pre boot prep
+		    if(!autoDetect && !OperatingSystem.isNTKernel(guestOSVal) && !guestOSVal.equalsIgnoreCase("linux"))   //if not xp, 2k, 2k3, or linux
+		    {
+			/*##########start-gov##########*/          
+			if(dumpHives && autoDetect)   //user selected dump sam and system hives to output dir   and os is not nt based          
+			{                        
+			    postOutput("Skipping sam dump because autodetected OS does not support this feature" + endL);
+			}
+			if(clearDomainPasswords && autoDetect)   //user selected dump sam and system hives to output dir   and os is not nt based          
+			{                        
+			    postOutput("Skipping clearing of cached domain passwords because autodetected OS does not support this feature" + endL);
+			}
+			if(clearPasswords && autoDetect)   //user selected dump sam and system hives to output dir   and os is not nt based          
+			{                        
+			    postOutput("Skipping clearing of passwords because autodetected OS does not support this feature" + endL);
+			}
+			/*##########end-gov##########*/   
+
+			//nt bluescreens when mounted so as a *WORKAROUND* we do not mount nt partitions anymore
+
+			//          if(OperatingSystem.getBaseOS(userChosenGuestOS).compareTo("nt") == 0)
+			//          {
+			//             //original nt was previously mounted so unmount it here since no further processing is required
+			//             if(unmountSnapshot(mountDriveLetter, false))   //unmount the snapshot for image from local machine FS
+			//             {
+			//                postOutput("Snapshot Unmounted" + endL);
+			//             }
+			//             else
+			//             {
+			//                postError("Snapshot Unmount Failed");
+			//                //return false;
+			//                return null;
+			//             }    
+			//          }
+
+			//return os;//return osName; //we are done - no further prep needed for these os'
+		    }
+		    else  //it is NT or linux
+		    {
+
+		    //handle Windows NT separately
+		    boolean isOriginalNT = false;
+		    if(OperatingSystem.getBaseOS(userChosenGuestOS).compareTo("nt") == 0)
+			isOriginalNT = true;
+
+		    boolean isXP2Kor2K3 = OperatingSystem.isNTKernel(os.getVmGuestOS());   //doesnt include original NT
+
+		    if(isXP2Kor2K3 /*|| isOriginalNT*/)   //if OS is NT kernel based or original NT (eg NT4.0)
+		    {
+			/*##########start-gov##########*/          
+			//TODO Strange problem when clear passwords is checked for NT, it bluescreens on boot -- without it is fine (maybe mount/unmount happens too fast?)
+			if(dumpHives)   //user selected dump sam and system hives to output dir             
+			{                                                                
+			    if(dumpRegHives(os, mountDriveLetter, outputDir, baseFileName))             
+			    {                                                             
+				postOutput("SAM, SYSTEM, and SECURITY Hives Successfully Extracted Into Output Directory" + endL);    
+			    }                                                             
+			    else                                                          
+			    {                                                             
+				postError("Error Extracting SAM, SYSTEM and SECURITY Hives From Image. Please Make Sure You Have Selected the Correct OS For Your Image From The Dropdown Menu");    
+				//return false;
+				return null;                                                 
+			    }                                                             
+			}                                                                
+
+			if(enableAdvanced){
+				if(clearDomainPasswords)   //user selected blank out all logon passwords                
+				{                                                                
+				    //modify DCC to clear passwords
+				    String[] dusersCleared = null;
+				    if((dusersCleared = clearDomainPasswords(os, mountDriveLetter, outputDir, baseFileName)) != null)                            
+				    {                                                             
+					postOutput("Passwords cleared for the following Domain users: " + endL);
+					StringBuffer sb = new StringBuffer();
+					for(int i = 0; i < dusersCleared.length - 1; i++)
+					    sb.append(dusersCleared[i] + ", ");
+					sb.append(dusersCleared[dusersCleared.length - 1]);
+					postOutput(sb.toString() + endL);
+				    }                                                             
+				    else                                                          
+				    {                                                             
+					postError("Error Clearing Cached Domain Logon Passwords. Uncheck The Clear Passwords Box And Try Again.");    
+					//return false;
+					return null;                                                 
+				    }                                                             
+				}                                                                
+			}
+			if(clearPasswords)   //user selected blank out all logon passwords                
+			{                                                                
+			    //modify SAM file to clear passwords
+			    String[] usersCleared = null;
+			    if((usersCleared = clearLocalPasswords(os, mountDriveLetter, outputDir, baseFileName)) != null)                            
+			    {                                                             
+				postOutput("Passwords cleared for the following Local users: " + endL);
+				StringBuffer sb = new StringBuffer();
+				for(int i = 0; i < usersCleared.length - 1; i++)
+				    sb.append(usersCleared[i] + ", ");
+				sb.append(usersCleared[usersCleared.length - 1]);
+				postOutput(sb.toString() + endL);
+			    }                                                             
+			    else                                                          
+			    {                                                             
+				postError("Error Clearing Logon Passwords. Uncheck The Clear Passwords Box And Try Again.");    
+				//return false;
+				return null;                                                 
+			    }                                                             
+			}                                                                
+			/*##########end-gov##########*/       
+
+			if(!isOriginalNT)
+			{   
+			    //try to extract the intelide.sys driver from one of the driver cache cab files on the image
+			    if(extractDriver("intelide.sys", os, mountDriveLetter))
+			    {
+				postOutput("Intel IDE Driver Ready" + endL);
+			    }
+			    else   //extracting the driver from the image failed, try to find it on the host OS
+			    {
+				postOutput("Driver Extraction From Image Failed, Checking Local Filesystem" + endL);
+
+				//copy intelide.sys driver to prevent 0x7b blue screen error on XP,2k,2003
+				String driverFileLoc = InternalConfigStrings.getString("LiveViewLauncher.DriverFileLocation");
+
+				if(copyDriver(driverFileLoc, os, mountDriveLetter))   
+				{
+				    postOutput("Intel IDE Driver Ready" + endL);
+				}
+				else
+				{
+				    postError("Adding Intel IDE Driver Failed.");
+				    postError("Make Sure You Have Selected The Correct OS From The Choices Above");
+				    unmountSnapshot(mountDriveLetter, true);         //force unmount of snapshot
+				    postOutput("Snapshot Unmounted" + endL);
+				    //return false;
+				    return null;
+				}
+			    }
+
+			    String systemHiveLoc = null;
+			    String systemRoot = os.getSystemRoot();
+			    if(systemRoot != null)
+				systemHiveLoc = systemRoot + "\\system32\\config\\system";
+			    else
+			    {
+				postError("System Hive Load Failed: Could not extract system root directory");
+				//return false;
+				return null;
+			    }
+
+			    if(loadSystemHive(systemHiveLoc))   //load the image system hive into local system registry
+			    {
+				postOutput("System Hive Loaded" + endL);
+			    }
+			    else
+			    {
+				postError("System Hive Load Failed");
+				//return false;
+				return null;
+			    }
+
+			    int currentControlSetVal = getCurrentControlSet();
+			    if(currentControlSetVal == -1)   //failed to extract control set
+				postError("Failed to extract CurrentControlSet value from guest registry");
+			    else
+				postOutput("Extracted Current Control Set Value: " + currentControlSetVal + endL);
 
 
-            String guestOSVal = null;
-            if(autoDetect)
-            {
-                osProductName = os.getPublicOSName();//queryRegistryForOSName(softHiveLoc);
-                if(!osProductName.equalsIgnoreCase("Win9xOrLinux"))   //if not windows 9x or linux
-                {
-                    guestOSVal = os.getVmGuestOS();
+			    //String macAddress = getMACAddress(currentControlSetVal);
+			    //postOutput("MAC: " + macAddress);
 
-                    if(OperatingSystem.getBaseOS(os.getVmGuestOS()).equals("nt"))
-                    {
-                        //unmount the snapshot (because it was mounted earlier to detect NT and system dir)
-                        if(unmountSnapshot(mountDriveLetter, false))   //unmount the snapshot for image from local machine FS
-                        {
-                            postOutput("Snapshot Unmounted" + endL);
-                        }
-                        else
-                        {
-                            postError("Snapshot Unmount Failed");
-                            //return false;
-                            return null;
-                        }    
-                    }
-                }
-                else   //win 9x or Linux -- TODO rather than default to "other" try to figure out actual guest os val
-                {
-                    guestOSVal = os.getVmGuestOS();//"other";
-                    osProductName = os.getPublicOSName();//"Windows 9x or Linux";
+			    //merge registry entries to loaded hive
+			    String mergeTemplateLoc = InternalConfigStrings.getString("LiveViewLauncher.MergeFileLocation");
 
-                    //unmount the snapshot (because it was mounted earlier to detect win9x)
-                    if(unmountSnapshot(mountDriveLetter, false))   //unmount the snapshot for image from local machine FS
-                    {
-                        postOutput("Snapshot Unmounted" + endL);
-                    }
-                    else
-                    {
-                        postError("Snapshot Unmount Failed");
-                        //return false;
-                        return null;
-                    }    
-                }
+			    if(makeChangesToRegistry(mergeTemplateLoc, currentControlSetVal))   
+			    {
+				postOutput("Critical Device Database Updated" + endL);
+			    }
+			    else
+			    {
+				postError("Critical Device Database Update Failed");
+				//return false;
+				return null;
+			    }
+			}   //if not original NT
 
-                postOutput("Detected " + osProductName + " installation on image" + endL);
+			if(isFullDisk)   //if we are dealing with a full disk
+			{
+			    if(!isOriginalNT)
+			    {
+				//unload system hive
+				if(unloadHive("SYSTEM"))   //unload the image system hive from local machine' registry
+				{
+				    postOutput("System Hive Unloaded" + endL);
+				}
+				else
+				{
+				    postError("System Hive Unload Failed");
+				    //return false;
+				    return null;
+				}
+			    }
 
-                if(guestOSVal == null)   //no close guest OS match could be found for OS name
-                {
-                    postError("Unknown Operating System: " + osProductName + " Please manually choose the most similar OS from the dropdown and try again");
-                    //return false;
-                    return null;
-                }      
-
-                //add osname to vmx
-                DataOutputStream vmxOutStream = null;
-                try
-                {
-                    vmxOutStream = new DataOutputStream(new FileOutputStream(vmxLoc,true));
-                    vmxOutStream.writeBytes("guestOS=\"" + guestOSVal + "\"" + endL);      //append guestOS="<osname>" to vmx file
-                    LogWriter.log("Added: " + "guestOS=\"" + guestOSVal + "\"" + " to " + vmxLoc);
-                    vmxOutStream.flush();
-                    vmxOutStream.close();
-                    postOutput("Added guest OS to vmx file" + endL);
-                }
-                catch(IOException ioe)
-                {
-                    postError("Error writing vmx file: " + vmxLoc);
-                    //return false;
-                    return null;
-                }
-            }
-            else   //not auto detect os
-            {
-                guestOSVal = userChosenGuestOS;
-                osProductName = os.getPublicOSName();
-            }
-
-            //if osname chosen is Me,98 or any other that doesnt require pre boot prep
-            if(!autoDetect && !OperatingSystem.isNTKernel(guestOSVal) && !guestOSVal.equalsIgnoreCase("linux"))   //if not xp, 2k, 2k3, or linux
-            {
-
-                //nt bluescreens when mounted so as a *WORKAROUND* we do not mount nt partitions anymore
-
-                //          if(OperatingSystem.getBaseOS(userChosenGuestOS).compareTo("nt") == 0)
-                //          {
-                //             //original nt was previously mounted so unmount it here since no further processing is required
-                //             if(unmountSnapshot(mountDriveLetter, false))   //unmount the snapshot for image from local machine FS
-                //             {
-                //                postOutput("Snapshot Unmounted" + endL);
-                //             }
-                //             else
-                //             {
-                //                postError("Snapshot Unmount Failed");
-                //                //return false;
-                //                return null;
-                //             }    
-                //          }
-
-                return os;//return osName; //we are done - no further prep needed for these os'
-            }      
-
-            //handle Windows NT separately
-            boolean isOriginalNT = false;
-            if(OperatingSystem.getBaseOS(userChosenGuestOS).compareTo("nt") == 0)
-                isOriginalNT = true;
-
-            boolean isXP2Kor2K3 = OperatingSystem.isNTKernel(os.getVmGuestOS());   //doesnt include original NT
-
-            //TODO Strange problem when clear passwords is checked for NT, it bluescreens on boot -- without it is fine (maybe mount/unmount happens too fast?)
-            if(isXP2Kor2K3 /*|| isOriginalNT*/)   //if OS is NT kernel based or original NT (eg NT4.0)
-            {
-
-                if(!isOriginalNT)
-                {   
-                    //try to extract the intelide.sys driver from one of the driver cache cab files on the image
-                    if(extractDriver("intelide.sys", os, mountDriveLetter))
-                    {
-                        postOutput("Intel IDE Driver Ready" + endL);
-                    }
-                    else   //extracting the driver from the image failed, try to find it on the host OS
-                    {
-                        postOutput("Driver Extraction From Image Failed, Checking Local Filesystem" + endL);
-
-                        //copy intelide.sys driver to prevent 0x7b blue screen error on XP,2k,2003
-                        String driverFileLoc = InternalConfigStrings.getString("LiveViewLauncher.DriverFileLocation");
-
-                        if(copyDriver(driverFileLoc, os, mountDriveLetter))   
-                        {
-                            postOutput("Intel IDE Driver Ready" + endL);
-                        }
-                        else
-                        {
-                            postError("Adding Intel IDE Driver Failed.");
-                            postError("Make Sure You Have Selected The Correct OS From The Choices Above");
-                            unmountSnapshot(mountDriveLetter, true);         //force unmount of snapshot
-                            postOutput("Snapshot Unmounted" + endL);
-                            //return false;
-                            return null;
-                        }
-                    }
-
-                    String systemHiveLoc = null;
-                    String systemRoot = os.getSystemRoot();
-                    if(systemRoot != null)
-                        systemHiveLoc = systemRoot + "\\system32\\config\\system";
-                    else
-                    {
-                        postError("System Hive Load Failed: Could not extract system root directory");
-                        //return false;
-                        return null;
-                    }
-
-                    if(loadSystemHive(systemHiveLoc))   //load the image system hive into local system registry
-                    {
-                        postOutput("System Hive Loaded" + endL);
-                    }
-                    else
-                    {
-                        postError("System Hive Load Failed");
-                        //return false;
-                        return null;
-                    }
-
-                    int currentControlSetVal = getCurrentControlSet();
-                    if(currentControlSetVal == -1)   //failed to extract control set
-                        postError("Failed to extract CurrentControlSet value from guest registry");
-                    else
-                        postOutput("Extracted Current Control Set Value: " + currentControlSetVal + endL);
-
-
-                    //merge registry entries to loaded hive
-                    String mergeTemplateLoc = InternalConfigStrings.getString("LiveViewLauncher.MergeFileLocation");
-
-                    if(makeChangesToRegistry(mergeTemplateLoc, currentControlSetVal))   
-                    {
-                        postOutput("Critical Device Database Updated" + endL);
-                    }
-                    else
-                    {
-                        postError("Critical Device Database Update Failed");
-                        //return false;
-                        return null;
-                    }
-                }   //if not original NT
-
-                if(isFullDisk)   //if we are dealing with a full disk
-                {
-                    if(!isOriginalNT)
-                    {
-                        //unload system hive
-                        if(unloadHive("SYSTEM"))   //unload the image system hive from local machine' registry
-                        {
-                            postOutput("System Hive Unloaded" + endL);
-                        }
-                        else
-                        {
-                            postError("System Hive Unload Failed");
-                            //return false;
-                            return null;
-                        }
-                    }
-
-                    //unmount snapshot
-                    if(unmountSnapshot(mountDriveLetter, false))   //unmount the snapshot for image from local machine FS
-                    {
-                        postOutput("Snapshot Unmounted" + endL);
-                    }
-                    else
-                    {
-                        postError("Snapshot Unmount Failed");
-                        //return false;
-                        return null;
-                    }
-                }
-                else   //partition only, so keep mounted snapshot open -- other things need to be done for partitions later
-                    postOutput("Keeping mounted snapshot open and registry loaded for partition" + endL);
-            }
-            else
-            {
-                //postOutput("OS is not NT Based" + endL);
-            }
-
+			    //unmount snapshot
+			    if(unmountSnapshot(mountDriveLetter, false))   //unmount the snapshot for image from local machine FS
+			    {
+				postOutput("Snapshot Unmounted" + endL);
+			    }
+			    else
+			    {
+				postError("Snapshot Unmount Failed");
+				//return false;
+				return null;
+			    }
+			}
+			else   //partition only, so keep mounted snapshot open -- other things need to be done for partitions later
+			    postOutput("Keeping mounted snapshot open and registry loaded for partition" + endL);
+		    }
+		    else
+		    {
+			/*##########start-gov##########*/          
+			if(dumpHives && autoDetect)   //user selected dump sam and system hives to output dir   and os is not nt based          
+			{                        
+			    postOutput("Skipping sam dump because autodetected OS does not support this feature" + endL);
+			}
+			if(clearDomainPasswords && autoDetect)   //user selected dump sam and system hives to output dir   and os is not nt based          
+			{                        
+			    postOutput("Skipping clearing of cached domain passwords because autodetected OS does not support this feature" + endL);
+			}
+			if(clearPasswords && autoDetect)   //user selected dump sam and system hives to output dir   and os is not nt based          
+			{                        
+			    postOutput("Skipping clearing of passwords because autodetected OS does not support this feature" + endL);
+			}
+			/*##########end-gov##########*/   
+			//postOutput("OS is not NT Based" + endL);
+		    }
+		    }
+		}
+	    }    
+	    //heuristic for deciding which partition is the "important" one, on multi-boot partitions... TODO
+	    /*
+	    for( int part = 1; part <= 4; part++){
+		    if(tempos[part-1] != null){
+                            postOutput("autodetected OS on partition" + part +":"+tempos[part-1].getPublicOSName() + endL);
+			    os =tempos[part-1];
+			    partitionIndex = part;
+		    }
+	    }
+	    postOutput("Selected partition" + partitionIndex +":"+tempos[partitionIndex-1].getPublicOSName() + endL);
+	    */
             //return true;//return osName;
-            return os;
+	    //postOutput("XXXXXXXXXXXXXXXXXXXXXXXXXXXXX\nreturning " + os.getPublicOSName());
+            //return os;
+	    return tempos;
         }
 
         /**
@@ -1945,7 +2605,188 @@ public class LiveViewLauncher
             return true;
         }
 
+        /*##########start-gov##########*/
+        /**
+         * Pulls the SAM, SYSTEM and Security hives out of the image and outputs them to the specified output 
+         * directory for use in archical, cracking, etc
+         * 
+         * Precondition: Snapshot is already mounted 
+         *
+         * @param os an OperatingSytem instance to pull hives from
+         * @param destDriveLetter this parameter is actually not used, but remains for historical reasons and uniformity
+         * @param outputDir the path to save the hives to
+         * @param baseFileName the base name (used as filenames for dumped files)
+         * @return true on success, false otherwise
+         */
+        private static boolean dumpRegHives(OperatingSystem os, String destDriveLetter, String outputDir, String baseFileName)
+        {
+	    myLogWriter.log("dumpRegHives called with: \n\t" +
+				os.getPublicOSName() + "\n\t" +
+				destDriveLetter + "\n\t" +
+				outputDir + "\n\t" +
+				baseFileName + "\n\t" +
+				"\n");
 
+            String hiveDir;
+
+            String systemRoot = os.getSystemRoot();
+            if(systemRoot != null)
+                hiveDir = systemRoot + "\\system32\\config\\";
+            else
+                return false;   //unhandled os
+
+            myLogWriter.log("Hive Directory: " + hiveDir);
+
+            FileChannel sourceChannel = null, destinationChannel = null;
+
+            /* copy sam file to output dir */   
+            File outSamFile = new File(outputDir + "\\" + baseFileName + ".SAM");
+            File inSamFile = new File(hiveDir + "SAM");   
+
+            try
+            {
+                sourceChannel = new FileInputStream(inSamFile).getChannel();         //source sam file
+                destinationChannel = new FileOutputStream(outSamFile).getChannel();      //dest sam file
+                sourceChannel.transferTo(0, sourceChannel.size(), destinationChannel);   //copy SAM file
+
+                if(sourceChannel != null)
+                    sourceChannel.close();
+                if(destinationChannel != null)
+                    destinationChannel.close();
+            }
+            catch(FileNotFoundException fnf)
+            {
+                postError("File Not Found -- Problem Extracting SAM Hive File: " + fnf.toString());
+                return false;
+            }
+            catch(IOException ioe)
+            {
+                postError("I/O Problem Extracting SAM Hive File: " + ioe.toString());
+                return false;
+            }
+
+
+            /* Copy SYSTEM hive file to output dir */
+            File outSysFile = new File(outputDir + "\\" + baseFileName + ".SYSTEM");
+            File inSysFile = new File(hiveDir + "SYSTEM");   
+
+            try
+            {
+                sourceChannel = new FileInputStream(inSysFile).getChannel();
+                destinationChannel = new FileOutputStream(outSysFile).getChannel();
+                sourceChannel.transferTo(0, sourceChannel.size(), destinationChannel);   //copy SYSTEM file from source to dest
+
+                if(sourceChannel != null)
+                    sourceChannel.close();
+                if(destinationChannel != null)
+                    destinationChannel.close();
+            }
+            catch(FileNotFoundException fnf)
+            {
+                postError("File Not Found -- Problem Extracting SYSTEM Hive File: " + fnf.toString());
+                return false;
+            }
+            catch(IOException ioe)
+            {
+                postError("I/O Problem Extracting SYSTEM Hive File: " + ioe.toString());
+                return false;
+            }
+
+            /* Copy SECURITY hive file to output dir */
+            File outSecFile = new File(outputDir + "\\" + baseFileName + ".SECURITY");
+            File inSecFile = new File(hiveDir + "SECURITY");
+
+            try
+            {
+                sourceChannel = new FileInputStream(inSecFile).getChannel();
+                destinationChannel = new FileOutputStream(outSecFile).getChannel();
+                sourceChannel.transferTo(0, sourceChannel.size(), destinationChannel);   //copy SECURITY file from source to dest
+
+                if(sourceChannel != null)
+                    sourceChannel.close();
+                if(destinationChannel != null)
+                    destinationChannel.close();
+            }
+            catch(FileNotFoundException fnf)
+            {
+                postError("File Not Found -- Problem Extracting SECURITY Hive File: " + fnf.toString());
+                return false;
+            }
+            catch(IOException ioe)
+            {
+                postError("I/O Problem Extracting SECURITY Hive File: " + ioe.toString());
+                return false;
+            }
+
+            return true;
+        }
+        /*##########end-gov##########*/
+
+
+        /*##########start-gov##########*/
+        /** 
+         * Blanks out local SAM passwords on an image so that it can be booted directly
+         * with blank passwords
+         * 
+         * Precondition: Snapshot is already mounted 
+         * 
+         * @param os and OperatingSystem instance
+         * @param destDriveLetter this parameter is actually not used, but remains for historical reasons and uniformity
+	 * @param outputDir output directory
+	 * @param baseFileName the base file name for dumped hashes
+         * @return a list of user accounts that had passwords cleared, null on failure
+         */
+        private static String[] clearLocalPasswords(OperatingSystem os, String destDriveLetter, String outputDir, String baseFileName)
+        {
+            //       String baseOS = getBaseOS(OS);
+            String samLoc;
+	    String sysLoc;
+
+            String systemRoot = os.getSystemRoot();
+            if(systemRoot != null){
+                sysLoc = systemRoot + "\\system32\\config\\SYSTEM";
+                samLoc = systemRoot + "\\system32\\config\\SAM";
+	    }else
+                return null;   //unhandled os selected
+
+            myLogWriter.log("********************SYSTEM Location: " + sysLoc);
+            myLogWriter.log("SAM Location: " + samLoc);
+
+            return RegistryParser.clearLocalPasswords(sysLoc,samLoc,outputDir,baseFileName);
+        }
+        /*##########end-gov##########*/
+
+        /*##########start-gov##########*/
+        /** 
+         * Blanks out Domain Cached Creds on an image so that it can be booted directly
+         * with blank passwords
+         * 
+         * Precondition: Snapshot is already mounted 
+         * 
+         * @param os and OperatingSystem instance
+         * @param destDriveLetter this parameter is actually not used, but remains for historical reasons and uniformity
+	 * @param outputDir output directory
+	 * @param baseFileName the base file name for dumped hashes
+         * @return a list of user accounts that had passwords cleared, null on failure
+         */
+        private static String[] clearDomainPasswords(OperatingSystem os, String destDriveLetter, String outputDir, String baseFileName)
+        {
+            String sysLoc;
+            String secLoc;
+
+            String systemRoot = os.getSystemRoot();
+            if(systemRoot != null){
+                sysLoc = systemRoot + "\\system32\\config\\SYSTEM";
+                secLoc = systemRoot + "\\system32\\config\\SECURITY";
+	    }else
+                return null;   //unhandled os selected
+
+            myLogWriter.log("SYSTEM Location: " + sysLoc);
+            myLogWriter.log("SECURITY Location: " + secLoc);
+
+            return RegistryParser.clearDomainPasswords(sysLoc,secLoc,outputDir,baseFileName);
+        }
+        /*##########end-gov##########*/
 
         /**
          * Calls an external process and posts the stderr messages to the output window
@@ -1960,7 +2801,7 @@ public class LiveViewLauncher
 
         public static String callExternalProcess(String[] cmd, boolean show)
         {
-            LogWriter.log("Executing: " + Arrays.toString(cmd));
+            myLogWriter.log("Executing: " + Arrays.toString(cmd));
             try
             {
                 externalProc = Runtime.getRuntime().exec(cmd);
@@ -1982,14 +2823,14 @@ public class LiveViewLauncher
                 //check for exit val - eg any errors
                 int exitVal = externalProc.waitFor();
 
-                LogWriter.log("External Proc Output: " + stdOutReader.getReturnText());
+                myLogWriter.log("External Proc Output: " + stdOutReader.getReturnText());
 
                 String errorMsg = stdErrReader.getReturnText();
                 if((errorMsg.trim().length() > 0) && (show == true)){
                     postError("ep: " + errorMsg);
                 }
                 else {
-                    LogWriter.log("External Process Error: " + errorMsg);
+                    myLogWriter.log("External Process Error: " + errorMsg);
                 }
 
                 if(exitVal == 0)   //no error
@@ -2020,6 +2861,11 @@ public class LiveViewLauncher
          */
         public static boolean mountSnapshot(String driveLetter, String snapshotVMDKLoc, int partition)
         {
+	    myLogWriter.log("mountSnapshot called with: \n\t" +
+				driveLetter + "\n\t" +
+				snapshotVMDKLoc + "\n\t" +
+				partition + "\n\t" +
+				"\n");
             String[] cmd = new String[4];
             cmd[0] = VMWARE_MOUNT_PATH;//InternalConfigStrings.getString("LiveViewLauncher.VMMountExecutableLocation");      //vmware-mount
             cmd[1] = "/v:" + partition;
@@ -2057,6 +2903,37 @@ public class LiveViewLauncher
             cmd[1] = "load";   
             cmd[2] = "HKLM\\NEWSYSTEM";
             cmd[3] = systemHiveLoc;
+
+            String stdOut = callExternalProcess(cmd);
+            if(stdOut == null)
+                return false;
+            return true;
+        }
+
+        /**
+         * Loads the hardware hive (of the image) in the local system's registry under the branch:
+         * HKLM\NEWHARDWARE
+         * This allows us to query/modify the system hive of the image as if it was part of the local
+         * system's registry (as opposed to writing an offline registry hive editor)
+         *
+         * @param hardwareHiveLoc the dumped hive file for import into the registry
+         * @return true on successful load, false otherwise
+         */
+        public static boolean loadHardwareHive(String hardwareHiveLoc)
+        {
+            //check if the hardware hive actually exists
+            File hardwareHiveFile = new File (hardwareHiveLoc);
+            if(!hardwareHiveFile.exists())
+            {
+                postError("Hardware hive file could not be found on disk image"); 
+                return false;
+            }
+
+            String[] cmd = new String[4];
+            cmd[0] = "reg";
+            cmd[1] = "load";   
+            cmd[2] = "HKLM\\NEWHARDWARE";
+            cmd[3] = hardwareHiveLoc;
 
             String stdOut = callExternalProcess(cmd);
             if(stdOut == null)
@@ -2173,7 +3050,7 @@ public class LiveViewLauncher
             else 
                 return false;    //unhandled os selected
 
-            LogWriter.log("Driver Destination Location: " + driverDestinationLoc);
+            myLogWriter.log("Driver Destination Location: " + driverDestinationLoc);
 
             //test if the intelide.sys driver is already present
             File f = new File(driverDestinationLoc + "\\" + driverNameToExtract);
@@ -2183,7 +3060,7 @@ public class LiveViewLauncher
                 return true;
             }
             else
-                LogWriter.log("intel ide driver not found in driver directory on image");
+                myLogWriter.log("intel ide driver not found in driver directory on image");
 
             String driverCabLoc = null;
             String cabPrefix = systemRootDir + "\\Driver Cache\\i386";
@@ -2197,17 +3074,17 @@ public class LiveViewLauncher
                 if(cabFile.exists())
                 {
                     foundCab = true;
-                    LogWriter.log("Found: " + cabFile.getName());
+                    myLogWriter.log("Found: " + cabFile.getName());
                 }
             }
             if(!foundCab)      //no spX.cab files found, check driver.cab
             {
                 driverCabLoc = cabPrefix + "\\driver.cab";
-                LogWriter.log("No spX.cab found, looking for: " + driverCabLoc);
+                myLogWriter.log("No spX.cab found, looking for: " + driverCabLoc);
                 cabFile = new File(driverCabLoc);
                 if(cabFile.exists())
                 {
-                    LogWriter.log("Found: " + driverCabLoc);
+                    myLogWriter.log("Found: " + driverCabLoc);
                     foundCab = true;
                 }
             }
@@ -2254,7 +3131,7 @@ public class LiveViewLauncher
             else 
                 return false;    //unhandled os selected
 
-            LogWriter.log("Driver Destination Location: " + driverDestinationLoc);
+            myLogWriter.log("Driver Destination Location: " + driverDestinationLoc);
 
             try    //copy intelde.sys driver to drivers directory so it can be booted in vmware's intel based vm
             {
@@ -2327,8 +3204,8 @@ public class LiveViewLauncher
 
             String stringToAdd = "config " +  "\"" + vmxPath + "\"";
 
-            LogWriter.log("Path TO VMServer vm-list: " + pathToVMList);
-            LogWriter.log("String to add: " + stringToAdd);
+            myLogWriter.log("Path TO VMServer vm-list: " + pathToVMList);
+            myLogWriter.log("String to add: " + stringToAdd);
 
             //check if the entry is already there
             try 
@@ -2341,7 +3218,7 @@ public class LiveViewLauncher
                 {  
                     if(line.equals(stringToAdd))
                     {
-                        LogWriter.log("vmx was already in vm-list, skipping append");
+                        myLogWriter.log("vmx was already in vm-list, skipping append");
                         return true;            //vmx is already in the config file
                     }
                 }
@@ -2673,7 +3550,7 @@ public class LiveViewLauncher
                     serialNum = null;
                 }
 
-                LogWriter.log("System Hive Loc: " + systemHiveLoc);
+                myLogWriter.log("System Hive Loc: " + systemHiveLoc);
 
                 if(serialNum != null && systemHiveLoc != null)   //we know it is either an XP or 2K aliased OS
                     worked = loadSystemHive(systemHiveLoc);
@@ -2687,7 +3564,7 @@ public class LiveViewLauncher
                     postOutput("Loaded System Hive For Disk Serial Number: " + endL);
             }
 
-            //get current control set value to pass to boo drive letter
+            //get current control set value to pass to boot drive letter
             int currentControlSetVal = getCurrentControlSet();
             if(currentControlSetVal == -1)   //failed to extract control set
                 postError("Failed to extract CurrentControlSet value from guest registry necessary for extracting boot drive letter");
@@ -2714,7 +3591,7 @@ public class LiveViewLauncher
                 if(regData != null)
                 {
                     diskSerialString = regData.substring(0,8);    //chop off first 8 characters (4 hex bytes)
-                    LogWriter.log("Disk Serial Number: " + diskSerialString);
+                    myLogWriter.log("Disk Serial Number: " + diskSerialString);
 
                     //convert hex string to integer array
                     long val = Long.parseLong( diskSerialString, 16 );
@@ -2787,6 +3664,150 @@ public class LiveViewLauncher
             return null;         //unknown string found
         }
 
+        /**
+         * determine guests original MAC address
+         *
+         * Precondition: Registry is already loaded and will be unloaded after method returns 
+         * return null means failure querying registry
+         *
+         * @param controlSetVal the control set in use in the registry
+         * @return the MAC address, as a string, null on error
+         */
+        private static String getMACAddress(int controlSetVal)
+        {
+            //pad control set value in string with 3 chars
+            String controlSetString = "ControlSet"  + new Formatter().format("%03d", controlSetVal).toString();
+
+	    //win2k/xp: HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\ Control\Class\{4D36E972-E325-11CE-BFC1-08002BE10318}
+	    //          must search recursively because it will be uner \0001, 0002, 0003...etc as NetworkAddress
+	    //win9x:    HKEY_LOCAL_MACHINE\System\ CurrentControlSet\Services\Class\Net
+	    //secondary: HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows Genuine Advantage
+            String regData = queryRegistry("HKLM\\NEWSYSTEM\\" + controlSetString + "\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002BE10318}",
+                    "NetworkAddress",
+                    "REG_SZ");
+
+            if(regData != null)
+                return  regData;
+
+            return null;         //unknown string found
+        }
+
+        /**
+         * determine the ammount of installed RAM 
+         *
+         * Precondition: Registry is already loaded and will be unloaded after method returns 
+         * return null means failure querying registry
+         *
+         * @return installed memory ammount in bytes, -1 on error
+         */
+        private static long getInstalledMemory()
+        {
+            //pad control set value in string with 3 chars
+
+            //search registry key HKLM/HARDWARE/RESOURCEMAP/System Resources/Physical Memory for RAM amount
+            String regData = queryRegistry2("HKLM\\HARDWARE\\RESOURCEMAP\\System Resources\\Physical Memory",
+                    ".Translated",
+                    "REG_RESOURCE_LIST");
+
+	    String count, iface, bus, ver, rev, unk, unk2, resType, disp, access, toss, base, length;
+	    count = iface = bus = ver = rev = unk = unk2 = resType = disp = access = toss = base = length = null;
+	    long ramTotal = 0;
+            if(regData != null){
+		    //postOutput(" \n\n memory: \n" + regData + "\n");
+                    //regData = removeSpaces(regData);
+                    //regData = getOnlyNumeric(regData);
+		    int idx=0;
+		    count = regData.substring(idx,idx+8);
+		    //postOutput("" + count + "\n");
+		    idx +=8;
+		    iface = regData.substring(idx,idx+8);
+		    //postOutput("" + iface + "\n");
+		    idx +=8;
+		    bus = regData.substring(idx,idx+8);
+		    //postOutput("" + bus + "\n");
+		    idx +=8;
+		    ver = regData.substring(idx,idx+4);
+		    //postOutput("" + ver  + "\n");
+		    idx +=4;
+		    unk = regData.substring(idx,idx+4);
+		    //postOutput("" + unk + "\n");
+		    idx +=4;
+		    unk2 = regData.substring(idx,idx+8);
+		    //postOutput("" + unk2 + "\n");
+		    idx +=8;
+                    do{
+			    resType = regData.substring(idx,idx+2);
+			    //postOutput("" + resType + "\n");
+			    idx +=2;
+			    disp = regData.substring(idx,idx+2);
+			    //postOutput("" + disp + "\n");
+			    idx +=2;
+			    access = regData.substring(idx,idx+2);
+			    //postOutput("" + access + "\n");
+			    idx +=2;
+			    toss = regData.substring(idx,idx+2);
+			    //postOutput("" + toss + "\n");
+			    idx +=2;
+			    base = regData.substring(idx,idx+16);
+			    //postOutput("" + base + "\n");
+			    
+			    
+			    idx +=16;
+			    length = regData.substring(idx,idx+16);
+			    //postOutput("" + length + "\n" );
+			    long num = Long.parseLong(length,16);
+			    //postOutput("This is long:=" + num + "\n");
+			    long res = bigToLittleEndian(num);  
+			    //postOutput("ram segment found: " +Long.toHexString(res) + " " + res/1024/1024 + "\n");
+			    ramTotal += res;
+			    idx +=16;
+		    }
+		    while(idx< regData.length());
+ 
+		    //postOutput("total ram: " + Long.toHexString(ramTotal) + " " + ramTotal/1024/1024 + "\n");
+
+		    return ramTotal;
+	    }
+
+
+            return -1;         //unknown string found
+        }
+	private static long bigToLittleEndian(long bigendian) {  
+	    ByteBuffer buf = ByteBuffer.allocate(8);  
+	   
+	    buf.order(ByteOrder.BIG_ENDIAN);  
+	    buf.putLong(bigendian);  
+	   
+	    buf.order(ByteOrder.LITTLE_ENDIAN);  
+	    return buf.getLong(0);  
+	}  
+
+	private static String removeSpaces(String s) {
+	  StringTokenizer st = new StringTokenizer(s," ",false);
+	  String t="";
+	  while (st.hasMoreElements()) t += st.nextElement();
+	  return t;
+	}
+	private static String getOnlyNumeric(String str) {
+	    
+	    if (str == null) {
+		return null;
+	    }
+
+	    StringBuffer strBuff = new StringBuffer();
+	    char c;
+	    
+	    for (int i = 0; i < str.length() ; i++) {
+		c = str.charAt(i);
+		
+		if (Character.isDigit(c)) {
+		    strBuff.append(c);
+		}
+	    }
+	    return strBuff.toString();
+	}
+	
+	
         /**
          * Unmounts mounted image and unloads the registry (for instance when program is closed prematurely)
          */   
@@ -2873,7 +3894,7 @@ public class LiveViewLauncher
                         if(isNumber == true)
                         {
                             inconsistent = true;
-                            LogWriter.log("Found Inconsistent Image File Extension: " + extensions[i]);
+                            myLogWriter.log("Found Inconsistent Image File Extension: " + extensions[i]);
                         }
                     }         
                 }
@@ -2881,7 +3902,7 @@ public class LiveViewLauncher
 
             if(isNumber && !inconsistent)   //if we have all numeric extensions
             {
-                LogWriter.log("All numeric extensions");
+                myLogWriter.log("All numeric extensions");
                 //basic bubble sort of file extensions and file names at the same time
                 for(int i = 0; i < extensions.length - 1; i++)
                 {
@@ -2902,12 +3923,12 @@ public class LiveViewLauncher
                         }
                     }
                 }
-                LogWriter.log("Sorted extensions numerically");
+                myLogWriter.log("Sorted extensions numerically");
                 //         System.out.println("Sorted Numerically: " + Arrays.toString(chunkFiles));
             }
             else   //not numeric extensions (or mixed extensions)
             {
-                LogWriter.log("non-numeric or mixed extensions detected");
+                myLogWriter.log("non-numeric or mixed extensions detected");
                 Arrays.sort(chunkFiles);   //sort alphabetically
                 //         System.out.println("sorted alphabetically: " + Arrays.toString(chunkFiles));
             }
@@ -2932,6 +3953,37 @@ public class LiveViewLauncher
             else
                 return 0;   
         }
+
+
+        private static final String getVMWareRegPath()
+        {
+            String vmRegPath = "HKLM\\SOFTWARE\\VMware, Inc.";
+
+            //search registry key HKLM\SOFTWARE\VMware, Inc.\Core
+            String regData = queryRegistry(vmRegPath,
+                    "Core",
+                    "REG_SZ");
+
+            if (regData != null) {
+                myLogWriter.log(vmRegPath);
+                return vmRegPath;
+            }
+
+            vmRegPath = "HKLM\\SOFTWARE\\WOW6432Node\\VMware, Inc.";
+
+            //search registry key HKLM\SOFTWARE\WOW6432Node\VMware, Inc.\Core
+            regData = queryRegistry(vmRegPath,
+                    "Core",
+                    "REG_SZ");
+
+            if (regData != null) {
+                myLogWriter.log(vmRegPath);
+                return vmRegPath;
+            }
+
+            return null;
+	} 
+
         /**
          * Determines version of VMWare installed
          *
@@ -2943,6 +3995,8 @@ public class LiveViewLauncher
 
             if(vmType == null)
                 return verError;
+
+	    thisComputerVMWare = vmType;
 
             //      System.err.println("TMV: ********************" + vmType);
             
@@ -2960,6 +4014,7 @@ public class LiveViewLauncher
                 String workstationVersion = queryRegistryForVMWareWorkstationVersion();  //likely only works for 6.0 +
                 if(workstationVersion != null){  //key exists
                     System.err.println("\nwsv: " + workstationVersion + "\n");
+		    thisComputerVMWare = thisComputerVMWare + " " + workstationVersion;
                     try{
                         if(Float.valueOf(workstationVersion.trim()).floatValue() < 5.5){
                             return verError;
@@ -2990,7 +4045,7 @@ public class LiveViewLauncher
         private static String queryRegistryForVMWareCore()
         {
             //search registry key HKLM\SOFTWARE\VMWare, Inc.\Core
-            String regData = queryRegistry("HKLM\\SOFTWARE\\VMWare, Inc.",
+            String regData = queryRegistry(VMWARE_REG_PATH,
                     "Core",
                     "REG_SZ");
 
@@ -3014,7 +4069,7 @@ public class LiveViewLauncher
         {
             //search registry key HKLM\SOFTWARE\VMWare, Inc.\Core
             //this key is only present on more recent versions of Workstation.  Many verions of 5.5 do not create this key.
-            String regData = queryRegistry("HKLM\\SOFTWARE\\VMWare, Inc.\\VMware Workstation",
+            String regData = queryRegistry(VMWARE_REG_PATH + "\\VMware Workstation",
                     "ProductVersion",
                     "REG_SZ");
 
@@ -3042,7 +4097,7 @@ public class LiveViewLauncher
         private static String queryRegistryForVMWareServerVersion()
         {
             //search registry key HKLM\SOFTWARE\VMWare, Inc.\Core
-            String regData = queryRegistry("HKLM\\SOFTWARE\\VMWare, Inc.\\VMware Server\\License.gsx.3.0-00",
+            String regData = queryRegistry(VMWARE_REG_PATH + "\\VMware Server\\License.gsx.3.0-00",
                     "ProductID",
                     "REG_SZ");
 
@@ -3064,7 +4119,7 @@ public class LiveViewLauncher
          * 
          * @return array of combo box items representing the display string and underlying physical device address value pairs, null on failure 
          */
-        private static PhysicalDiskInfo[] getPhysicalDeviceItems()
+        public static PhysicalDiskInfo[] getPhysicalDeviceItems()
         {
             ArrayList diskInfoList = new ArrayList();
             PhysicalDiskInfo[] returnVal = null;
@@ -3102,10 +4157,10 @@ public class LiveViewLauncher
                 if(!line.startsWith("Index") && !line.equals(""))   //if line is not a column header 
                 {   
                     deviceIndex = line.substring(0,1);   //extract index of this device
-                    LogWriter.log("Device Index: " + deviceIndex);
+                    myLogWriter.log("Device Index: " + deviceIndex);
 
                     String sizeString = line.substring(1,line.length()).trim();
-                    LogWriter.log("Device Size: " + sizeString);
+                    myLogWriter.log("Device Size: " + sizeString);
 
                     if(sizeString.length() > 0)   //check if a size is reported (size is not reported for devices like card readers when no card is inserted)
                     {
@@ -3157,29 +4212,30 @@ public class LiveViewLauncher
                                     MasterBootRecord tmpMbr = new MasterBootRecord(unsignedTempMBRBuffer);
                                     if(tmpMbr.isValidMBR())
                                     {
-                                        LogWriter.log("Added " + wmiPhysicalDriveString + " detected via WMI with valid MBR to list of devices" + endL);
+                                        myLogWriter.log("Added " + wmiPhysicalDriveString + " detected via WMI with valid MBR to list of devices" + endL);
                                         diskInfoList.add(pdi);   //add it to list of disks
                                     }
                                     else
-                                        LogWriter.log("Skipped " + wmiPhysicalDriveString + " detected with WMI because it has an invalid MBR");
+                                        myLogWriter.log("Skipped " + wmiPhysicalDriveString + " detected with WMI because it has an invalid MBR");
                                 }
                                 else
-                                    LogWriter.log("Excluded Device Index: " + deviceIndex + " because it is the host boot drive");
+                                    myLogWriter.log("Excluded Device Index: " + deviceIndex + " because it is the host boot drive");
                             }
                             else
-                                LogWriter.log("WARNING: Current Device " + deviceIndex + " is not in indexModelMapping");
+                                myLogWriter.log("WARNING: Current Device " + deviceIndex + " is not in indexModelMapping");
                         }
                         else
-                            LogWriter.log("Skipped Device: " + deviceIndex + " detected w/ WMI because a size of 0 was reported");
+                            myLogWriter.log("Skipped Device: " + deviceIndex + " detected w/ WMI because a size of 0 was reported");
                     }
                     else
-                        LogWriter.log("Skipped Device: " + deviceIndex + " detected w/ WMI because no size was reported");
+                        myLogWriter.log("Skipped Device: " + deviceIndex + " detected w/ WMI because no size was reported");
                 }
             }
 
             //now iterate through all physical devices to find ones not reported by wmi because
             //of not relating logical to physical device (eg MIP)
-            final int MAX_PHYS_DRIVE_NUM = 20;
+            //final int MAX_PHYS_DRIVE_NUM = 40;  //FIXME
+	    final int MAX_PHYS_DRIVE_NUM = Integer.parseInt(MAX_PHYS_DRIVE_NUM_STR);
             String physicalDriveString;
             for(int i = 0; i < MAX_PHYS_DRIVE_NUM; i++)   
             {
@@ -3239,12 +4295,12 @@ public class LiveViewLauncher
                     if(tmpMbr.isValidMBR())
                     {
                         double physicalDriveSizeBytes = tmpMbr.totalSectorsFromPartitions() * 512;
-                        LogWriter.log("Added " + physicalDriveString + " not detected by WMI to list of physical devices" + endL);
+                        myLogWriter.log("Added " + physicalDriveString + " not detected by WMI to list of physical devices" + endL);
                         pdi = new PhysicalDiskInfo(Integer.toString(i), "IDE", "Hard Disk " + i, physicalDriveSizeBytes);
                         diskInfoList.add(pdi);   //add it to list of disks
                     }
                     else
-                        LogWriter.log("Skipped " + physicalDriveString + " because it has an invalid MBR");
+                        myLogWriter.log("Skipped " + physicalDriveString + " because it has an invalid MBR");
                 }
             }
 
@@ -3253,7 +4309,7 @@ public class LiveViewLauncher
             for(int i = 0; i < diskInfoList.size(); i++)
             {
                 returnVal[i] = (PhysicalDiskInfo)diskInfoList.get(i);
-                LogWriter.log("Physical Disk Info " + i + ": " + returnVal[i]);
+                myLogWriter.log("Physical Disk Info " + i + ": " + returnVal[i]);
             }
 
             return returnVal;
@@ -3296,7 +4352,7 @@ public class LiveViewLauncher
                 if(beginningOfIndex > 0)   //found prefix
                 {
                     deviceIndex = Integer.parseInt(line.substring(beginningOfIndex + prefix.length(), beginningOfIndex + prefix.length() + 1));   //extract index value
-                    LogWriter.log("Bootable device is index: " + deviceIndex);           
+                    myLogWriter.log("Bootable device is index: " + deviceIndex);           
                 }
             }
             return deviceIndex;   
@@ -3455,6 +4511,41 @@ public class LiveViewLauncher
             }
             return regData;
         }
+        public static String queryRegistry2(String regPath, String regKeyName, String regType)
+        {
+            //search registry for regPath\regKeyName
+            String[] cmd = new String[3];
+            cmd[0] = "reg";
+            cmd[1] = "query";   
+            cmd[2] = "\"" + regPath + "\"";
+            //cmd[3] = "/v";
+            //cmd[4] = regKeyName;
+
+            String regData = null;
+
+            String outputBuffer = callExternalProcess(cmd,false);
+
+            if(outputBuffer == null)
+                return null;
+
+            String[] outputLines = outputBuffer.split(System.getProperty("line.separator"));
+
+            String line;
+            boolean done = false;
+            int offset;
+
+            for(int i = 0; !done && i < outputLines.length; i++)   //for every output line
+            {
+                line = outputLines[i];
+                if(line.trim().startsWith(regKeyName))
+                {
+                    offset = line.indexOf(regType) + regType.length();
+                    regData = line.substring(offset,line.length()).trim();
+                    done = true;
+                }
+            }
+            return regData;
+        }
 
         /**
          * Build the path to the vmrun executable (which is different based
@@ -3481,11 +4572,11 @@ public class LiveViewLauncher
          */
         private static String getVMWareInstallDir(boolean isVMWareServer)
         {
-            StringBuffer regPath = new StringBuffer("HKLM\\SOFTWARE\\VMware, Inc.\\");
+            StringBuffer regPath = new StringBuffer(VMWARE_REG_PATH);
             if(isVMWareServer)
-                regPath.append("VMware Server");
+                regPath.append("\\VMware Server");
             else
-                regPath.append("VMware Workstation");
+                regPath.append("\\VMware Workstation");
 
             return queryRegistry(regPath.toString(), "InstallPath", "REG_SZ");
 
@@ -3503,9 +4594,9 @@ public class LiveViewLauncher
         // TMV TODO FIX server 1.0.8 location find
         private static String queryRegistryForServerVMMountPath()
         {
-            String path = queryRegistry("HKLM\\SOFTWARE\\VMWare, Inc.\\Server\\vmware-mount.exe", "Path", "REG_SZ");
+            String path = queryRegistry(VMWARE_REG_PATH + "\\Server\\vmware-mount.exe", "Path", "REG_SZ");
             if(path != null){
-                LogWriter.log("Server version of vmware-mount detected");
+                myLogWriter.log("Server version of vmware-mount detected");
                 return path + "vmware-mount.exe";
             }
             return path;
@@ -3523,7 +4614,7 @@ public class LiveViewLauncher
         {
             String path = queryRegistry("HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\vmware-mount.exe", "Path", "REG_SZ");
             if(path != null){
-                LogWriter.log("Old workstation version of vmware-mount detected");
+                myLogWriter.log("Old workstation version of vmware-mount detected");
                 return path + "vmware-mount.exe";
             }
             return path;
@@ -3539,7 +4630,7 @@ public class LiveViewLauncher
          */
         private static String queryRegistryForVDDKVMMountPath()
         {
-            String path = queryRegistry("HKLM\\SOFTWARE\\VMware, Inc.\\VMware Virtual Disk Development Kit", "InstallPath", "REG_SZ");
+            String path = queryRegistry(VMWARE_REG_PATH + "\\VMware Virtual Disk Development Kit", "InstallPath", "REG_SZ");
             if(path != null)
                 return path + "bin\\vmware-mount.exe";
             return path;
@@ -3564,7 +4655,7 @@ public class LiveViewLauncher
          */
         public static void postError(String line)
         {
-            LogWriter.log("Error: " + line);
+            myLogWriter.log("Error: " + line);
             messageOutputArea.append("ERROR>     " + line + endL);   //write the error message to out window
             messageOutputArea.setCaretPosition(messageOutputArea.getText().length());   //scroll down
         }
@@ -3576,7 +4667,7 @@ public class LiveViewLauncher
          */
         public static void logError(String line)
         {
-            LogWriter.log("Error: " + line);
+            myLogWriter.log("Error: " + line);
         }
 
         /**
@@ -3591,7 +4682,7 @@ public class LiveViewLauncher
             {
                 public void run() 
                 {
-                    LogWriter.log("Output: " + fLine);
+                    myLogWriter.log("Output: " + fLine);
                     messageOutputArea.append(fLine);   //output console line
                     // Scroll down as text is output
                     messageOutputArea.setCaretPosition(messageOutputArea.getText().length());
@@ -3609,7 +4700,7 @@ public class LiveViewLauncher
             Object[] options = {"Okay","No Thanks"};   //button titles
             int answer = JOptionPane.showOptionDialog(frame, 
                     "You are testing a pre-release version of Live View, intended for testing purposes only" + endL +
-                    "Please email bugs and comments to the person that emailed this software to you." + endL +
+                    "Please email bugs and comments to tvidas@cert.org." + endL +
                     "Please do not re-distribute this software." + endL +
                     "Click 'Okay' to acknowledge these terms",
                     "Beta Version Disclaimer",
@@ -3626,8 +4717,9 @@ public class LiveViewLauncher
         }
 
         //aux funtion used for troubleshooting, simply displays system properties
-        private static void GetSystemProps()
+        private static String getSystemProps()
         {
+            String ret = null;
 
             Properties prop = System.getProperties();
             Enumeration keys = prop.keys();
@@ -3635,8 +4727,31 @@ public class LiveViewLauncher
                 String key = (String)keys.nextElement();
                 String value = (String)prop.get(key);
                 System.err.println(key + ": " + value);
+                postOutput(key + ": " + value + "\n");
+		ret = ret + key + ": " + value + "\n";
+
            }
+
+	   return ret;
         }
+
+        /**
+         * Checks the user editable conf file (outside the jar) for a config string, if not found, uses default from jar file properties file
+         * @param str the string (actually substring eg for LiveViewLauncher.defaultRamSize use defaultRamSize) 
+	 * @return the conf string if it exists
+         */
+	private static String getConfString(String str){
+		String theString = null;
+		if(ecs.getString("LiveView." + str).equals("notfound")){
+			theString = InternalConfigStrings.getString("LiveViewLauncher." + str);
+		}
+		else{
+			theString = ecs.getString("LiveView." + str);
+		}
+
+		return theString;
+
+	}
 
     }
 

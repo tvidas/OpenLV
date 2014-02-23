@@ -1,0 +1,50 @@
+winVista
+winVista-64
+winServer2008Web-32
+winServer2008Web-64
+winServer2008StandardCore-32
+winServer2008StandardCore-64
+winServer2008Standard-32
+winServer2008Standard-64
+winServer2008SmallBusinessPremium-32
+winServer2008SmallBusinessPremium-64
+winServer2008SmallBusiness-32
+winServer2008SmallBusiness-64
+winServer2008EnterpriseCore-32
+winServer2008EnterpriseCore-64
+winServer2008Enterprise-32
+winServer2008Enterprise-64
+winServer2008DatacenterCore-32
+winServer2008DatacenterCore-64
+winServer2008Datacenter-32
+winServer2008Datacenter-64
+winServer2008Cluster-32
+winServer2008Cluster-64
+windows7srv-64
+windows7
+windows7-64
+winMe
+Windows Me
+win98
+Windows 98
+win95
+Windows 95
+win2000Serv
+Windows 2000 Server
+win2000AdvServ
+Windows 2000 Advanced Server
+winNetStandard
+winNetBusiness
+winNetWeb
+winNetEnterprise
+winNetDatacenter
+win2000Pro
+Windows 2000 Professional
+winXPPro
+Windows XP Professional
+winXPHome
+Windows XP Home Edition
+winXPPro-64
+winNT
+Windows NT
+win2000

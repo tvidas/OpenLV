@@ -24,6 +24,7 @@ package cert.forensics.liveview;
 
 
 import java.io.IOException;
+import java.io.File;
 import java.text.Format;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -45,7 +46,38 @@ import java.util.logging.SimpleFormatter;
 
 public class LogWriter
 {
+    private static Logger tlogger;
     private static Logger logger;
+    private static String recentFile;
+    private static String logFile;
+
+    /**
+     * constructor requires two files and logs to both
+     *
+     * @param tFile the "temporary" file to log to - MostRecentRun.log
+     * @param pFile the "permnent" file to log to - LiveView.log
+     */
+    public LogWriter(String tFile, String pFile){
+	    recentFile = tFile;
+	    logFile = pFile;
+	
+
+	    //Quick check on permanent files size, right now just deletes if over 5 MB
+	    File permfile = new File(pFile);
+	    if(permfile.exists()){
+		    if(permfile.length() > LiveViewLauncher.BYTES_PER_MB * 5){
+			    try{
+				permfile.delete();
+				permfile.createNewFile();
+			    }
+			    catch(Exception e){
+				    System.err.println(e.getMessage());
+			    }
+
+		    }
+	    }
+	    
+    }
 
     /**
      * simply a funtion that facilitates logging, attempts to create a new log if one doesn't exist
@@ -60,13 +92,19 @@ public class LogWriter
                 //Format formatter = new SimpleDateFormat("yyyy_MM_dd");
                 // Create an appending file handler
                 //FileHandler handler = new FileHandler(formatter.format(new Date()) + ".log", false);
-                FileHandler handler = new FileHandler("MostRecentRun.log", false);
+                //FileHandler handler = new FileHandler("MostRecentRun.log", false);
+                FileHandler handler = new FileHandler(recentFile, false);
                 handler.setFormatter(new MinimalLogFormatter());
 
                 // Add to the desired logger
                 logger = Logger.getLogger("cert.forensics.liveview");
                 logger.addHandler(handler);
 
+                FileHandler phandler = new FileHandler(logFile, true);
+                phandler.setFormatter(new MinimalLogFormatter());
+                logger.addHandler(phandler);
+
+                logger.info("Note: This is a log file for LiveView.  It can safely be deleted.");
                 logger.info("============================START============================");
             } 
             catch (IOException e) 

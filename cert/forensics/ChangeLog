@@ -1,3 +1,26 @@
+
+  Made MadePhysicalDevices configurable via config file
+
+* 06/02/10 - Version 0.8 beta2
+  Added support for some multi-partition configurations
+  Added Help Archive creation ability
+  Misc bugfixes
+
+* 12/22/09 - Version 0.8 beta
+  Added support for Windows 7 
+  Added support for VMWare Workstation 7
+  Added user editable Config file (LiveView.ini)
+  Added support for secondary disks ("data" disks)
+  Added support for blanking Cached Domain Credentials #####Gov#####
+  Added better password blanking handling (like syskey)#####Gov#####
+  Increased the number of usuable PhysicalDevices (so LV works with systems
+  that have more than 20 devices now)
+  Adjusted the way logging is handled (per-use AND permanent)
+  Adjusted the way the Guest time is handled
+  Adjusted the way some GUI components are displayed
+  Updated to be "more 64 bit" compatible
+
+
 * 02/17/09 - Verison 0.7b
   Fixed an issue with 0.7a that prevented the vmrun path being locate in
     Server 1.x

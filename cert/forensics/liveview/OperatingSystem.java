@@ -46,6 +46,7 @@ public class OperatingSystem
     private String publicOSName;
     private String systemRoot;
     private static HashMap  prodNameToGuestOSMap = new HashMap();  //maps windows product name (from registry) to its corresponding vmware guestos name
+    private int partitionID;
 
     /**
      * class constructor, automatically mounts if needed, DOES NOT UNMOUNT - the caller is responsible for that
@@ -61,6 +62,7 @@ public class OperatingSystem
         //map the user displayed OS choice vals to the vmware guest os values 
         String[] guestOSVals = InternalConfigStrings.getString("LiveViewLauncher.GuestOSVals").split(","); //get the vmware guest OS values from properties file
         String[] osVals = InternalConfigStrings.getString("LiveViewLauncher.OSChoices").split(","); //get the corresponding plain text os choices from properties file
+	partitionID = partition;
 
         for(int i = 0; i < guestOSVals.length && i < osVals.length; i++)
         {
@@ -91,7 +93,7 @@ public class OperatingSystem
             else
             {
                 LiveViewLauncher.postOutput("Snap mount failed.  Tried: " + mountDriveLetter + "," + snapshotVMDKLoc + "," + partition + LiveViewLauncher.endL);
-                throw new LiveViewException("Snapshot Mount Failed. Could Not Auto Detect OS For Your Image.");
+                throw new LiveViewException("Snapshot Mount Failed. Could Not Auto Detect OS For Partition.");
             }
 
             //check the two default windows directory locations for software hive
@@ -107,7 +109,7 @@ public class OperatingSystem
                 softwareHive = new File(softHiveLoc);
                 if(!softwareHive.exists())
                 {
-                    LiveViewLauncher.postOutput("Could not locate software hive on system" + LiveViewLauncher.endL);
+                    LiveViewLauncher.postOutput("Could not locate software hive on partition" + LiveViewLauncher.endL);
                     LiveViewLauncher.postOutput("Assuming Windows 9x or Linux OS" + LiveViewLauncher.endL);
                     detectedWin9xOrLinux = true;
                 }
@@ -224,6 +226,10 @@ public class OperatingSystem
             String searchStr = null;
             if(publicOSName.toUpperCase().contains(" XP"))
                 searchStr = " XP";
+            else if(publicOSName.toUpperCase().contains("WINDOWS7"))
+                searchStr = "WINDOWS7";
+            else if(publicOSName.toUpperCase().contains("WINDOWS 7"))
+                searchStr = "WINDOWS 7";
             else if(publicOSName.toUpperCase().contains(" VISTA"))
                 searchStr = " VISTA";
             else if(publicOSName.toUpperCase().contains(" 2000"))
@@ -239,7 +245,6 @@ public class OperatingSystem
 
             Set keys = prodNameToGuestOSMap.keySet();
             Iterator osKeys = keys.iterator();
-
             String osLongName, osVMGuestVal;
             while(osKeys.hasNext())
             {
@@ -258,8 +263,11 @@ public class OperatingSystem
         //      publicOSName = "Windows 9x or Linux";
         //    }
 
-        if(guestOSVal == null)  //no close match could be found above
+        if(guestOSVal == null){  //no close match could be found above
             LiveViewLauncher.postError("Unknown Operating System: " + publicOSName + " Please manually choose the most similar OS from the dropdown and try again");
+	}else{
+            LiveViewLauncher.postOutput("AutoDetected Operating System: " + publicOSName + " " + LiveViewLauncher.endL);
+	}
 
         return guestOSVal;
     }
@@ -289,6 +297,15 @@ public class OperatingSystem
     }
 
     /**
+     * inspector for partitionID 
+     * @return partitionID datamember
+     */
+    public int getPartitionID()
+    {
+        return partitionID;
+    }
+
+    /**
      * inspector for publicOSName
      * @return publicOSName datamember
      */
@@ -315,6 +332,7 @@ public class OperatingSystem
                 vmGuestOS.compareTo("winNetBusiness") == 0 ||      //win2k3
                 vmGuestOS.compareTo("winNetStandard-64") == 0 ||   //win2k3
                 vmGuestOS.compareTo("winNetEnterprise-64") == 0 || //win2k3
+                vmGuestOS.compareTo("whistler") == 0 || 
                 vmGuestOS.compareTo("win2k3") == 0)
         {
             return "xp";
@@ -325,9 +343,35 @@ public class OperatingSystem
             return "vista";
         }
         else if (vmGuestOS.compareTo("longhorn") == 0 ||  //server 2008
-                vmGuestOS.compareTo("longhorn-64") == 0 )    //server 2008
+                vmGuestOS.compareTo("longhorn-64") == 0  ||   //server 2008
+		vmGuestOS.compareTo("winServer2008Web-32") == 0 ||
+		vmGuestOS.compareTo("winServer2008Web-64") == 0 ||
+		vmGuestOS.compareTo("winServer2008StandardCore-32") == 0 ||
+		vmGuestOS.compareTo("winServer2008StandardCore-64") == 0 ||
+		vmGuestOS.compareTo("winServer2008Standard-32") == 0 ||
+		vmGuestOS.compareTo("winServer2008Standard-64") == 0 ||
+		vmGuestOS.compareTo("winServer2008SmallBusinessPremium-32") == 0 ||
+		vmGuestOS.compareTo("winServer2008SmallBusinessPremium-64") == 0 ||
+		vmGuestOS.compareTo("winServer2008SmallBusiness-32") == 0 ||
+		vmGuestOS.compareTo("winServer2008SmallBusiness-64") == 0 ||
+		vmGuestOS.compareTo("winServer2008EnterpriseCore-32") == 0 ||
+		vmGuestOS.compareTo("winServer2008EnterpriseCore-64") == 0 ||
+		vmGuestOS.compareTo("winServer2008Enterprise-32") == 0 ||
+		vmGuestOS.compareTo("winServer2008Enterprise-64") == 0 ||
+		vmGuestOS.compareTo("winServer2008DatacenterCore-32") == 0 ||
+		vmGuestOS.compareTo("winServer2008DatacenterCore-64") == 0 ||
+		vmGuestOS.compareTo("winServer2008Datacenter-32") == 0 ||
+		vmGuestOS.compareTo("winServer2008Datacenter-64") == 0 ||
+		vmGuestOS.compareTo("winServer2008Cluster-32") == 0 ||
+		vmGuestOS.compareTo("winServer2008Cluster-64") == 0 )
         {
             return "2008";
+        }
+        else if (vmGuestOS.compareTo("windows7") == 0 || 
+                vmGuestOS.compareTo("windows7srv-64") == 0 || 
+                vmGuestOS.compareTo("windows7-64") == 0)
+        {
+            return "win7";
         }
         else if (vmGuestOS.compareTo("win2000") == 0 || 
                 vmGuestOS.compareTo("win2000AdvServ") == 0 || 
@@ -370,6 +414,7 @@ public class OperatingSystem
                 (getBaseOS(vmGuestOS).compareTo("2k") == 0) ||
                 (getBaseOS(vmGuestOS).compareTo("2003") == 0) ||
                 (getBaseOS(vmGuestOS).compareTo("2008") == 0) ||
+                (getBaseOS(vmGuestOS).compareTo("win7") == 0) ||
                 (getBaseOS(vmGuestOS).compareTo("vista") == 0))
             return true;
         else
