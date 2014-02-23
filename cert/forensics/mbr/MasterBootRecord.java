@@ -1,33 +1,41 @@
+/*
+    MasterBootRecord.java
+    Copyright (C) 2006-2008 Carnegie Mellon University
+ 
+    Tim Vidas <tvidas at gmail d0t com>
+    Brian Kaplan <bfkaplan at cmu d0t edu>
+
+
+    This program is free software; you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the Free
+    Software Foundation; either version 2 of the License, or (at your option)
+    any later version.
+
+    This program is distributed in the hope that it will be useful, but WITHOUT
+    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+    FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+    more details.
+
+    You should have received a copy of the GNU General Public License along with
+    this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+    Place, Suite 330, Boston, MA 02111-1307 USA
+*/
+
 package cert.forensics.mbr;
-/* 
- * Represents a 512 byte Master Boot Record for a disk  
- *
- * Author: 	Brian Kaplan
- * 			bfkaplan@cmu.edu
- * 
- * Copyright (C) 2006  Carnegie Mellon University
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- */
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
+
+/**
+ * MasterBootRecord 
+ * Represents a 512 byte Master Boot Record for a disk  
+ * @author Tim Vidas
+ * @author Brian Kaplan
+ * @version 0.7, Jan 2009
+ */
 
 public class MasterBootRecord
 {
@@ -43,7 +51,11 @@ public class MasterBootRecord
 	private int[] marker;
 	private long fileSizeBytes;	
 	private int[] mbrUnsignedBytes;
-	
+
+    /**
+     * constructor for MasterBootRecord
+     * @param java File to a disk image to obtain the mbr from
+     */
 	public MasterBootRecord(File image)
 	{
 		mbrUnsignedBytes = new int[512];
@@ -66,12 +78,20 @@ public class MasterBootRecord
 
 		initialize(mbrUnsignedBytes);
 	}
-	
+
+    /**
+     * constructor for MasterBootRecord
+     * @param mbrUnsignedBytes a boot record as bytes
+     */
 	public MasterBootRecord(int[] mbrUnsignedBytes)
 	{
 		initialize(mbrUnsignedBytes);
 	}
 
+    /**
+     * initializes datamembers from bytes representing an MBR
+     * @param mbrUnsignedBytes a boot record as bytes
+     */
 	private void initialize(int[] mbrUnsignedBytes)
 	{
 		this.mbrUnsignedBytes = mbrUnsignedBytes;
@@ -107,16 +127,28 @@ public class MasterBootRecord
 		}
 	}
 	
+    /**
+     * inspector for bootCode
+     * @return the bootCode datamember
+     */
 	public int[] getBootCode()
 	{
 		return bootCode;
 	}
 
+    /**
+     * inspector for marker
+     * @return the marker datamember
+     */
 	public int[] getMarker()
 	{
 		return marker;
 	}
 	
+    /**
+     * determines a bootable partition
+     * @return the bootable PartitionEntry
+     */
 	public PartitionEntry getBootablePartition()
 	{
 		if(partitionEntry1.isBootable())
@@ -131,6 +163,10 @@ public class MasterBootRecord
 			return null;
 	}
 	
+    /**
+     * determines bootable partition index
+     * @return the id of the bootable partition (1-4)
+     */
 	public int getBootablePartitionIndex()
 	{
 		if(partitionEntry1.isBootable())
@@ -146,27 +182,50 @@ public class MasterBootRecord
 	}
 
 
+    /**
+     * inspector for ParitionEntry1
+     * @return the PartitionEntry1 datamember
+     */
 	public PartitionEntry getPartitionEntry1()
 	{
 		return partitionEntry1;
 	}
 
+    /**
+     * inspector for ParitionEntry2
+     * @return the PartitionEntry2 datamember
+     */
 	public PartitionEntry getPartitionEntry2()
 	{
 		return partitionEntry2;
 	}
 
+    /**
+     * inspector for ParitionEntry3
+     * @return the PartitionEntry3 datamember
+     */
 	public PartitionEntry getPartitionEntry3()
 	{
 		return partitionEntry3;
 	}
 
+    /**
+     * inspector for ParitionEntry4
+     * @return the PartitionEntry4 datamember
+     */
 	public PartitionEntry getPartitionEntry4()
 	{
 		return partitionEntry4;
 	}
 	
-	//total sectors reported by all partitions on disk
+	/**
+     * get total sectors reported by all partitions on disk
+     *
+     * Note on some drives the Vista installer may actually set this value too large
+     * It has been observed on 13.5 GB drives
+     *
+     * @return the total number of sectors
+     */
 	public long totalSectorsFromPartitions()
 	{
 		return 	partitionEntry1.getNumSectors() +
@@ -175,13 +234,21 @@ public class MasterBootRecord
 				partitionEntry4.getNumSectors();
 	}
 	
-	//use disk image file size to calculate total sectors
+	/**
+     * use disk image file size to calculate total sectors
+     *
+     * @return total number of sectors
+     */
 	public long totalSectorsOnDiskFromFile()
 	{
 		return fileSizeBytes / BYTES_PER_SECTOR;
 	}
 	
-	/* used for getting the "end cylinder" value for a disk */
+	/**
+     * used for getting the "end cylinder" value for a disk 
+     *
+     * @return the end cylinder
+     */
 	public long largestCylinderValOnDisk()
 	{
 		//return the maximum end cylinder value for the four partitions
@@ -191,9 +258,11 @@ public class MasterBootRecord
 						);
 	}
 	
-	/* 
+	/**
 	 * Checks if the MBR is valid by checking if there is a bootable partition and if the bootable
 	 * partition is valid (of a known type)
+     *
+     * @return true if there is a bootable partition, false otherwise
 	 */
 	public boolean isValidMBR()
 	{		
@@ -206,17 +275,20 @@ public class MasterBootRecord
 		return true;
 	}
 	
-	/*
-	 * Checks for the 33 C0 8E starting bootcode common to Windows Systems (as far as I can tell)
+	/**
+	 * Checks for the 33 C0 8E starting bootcode common to known Windows Systems
 	 * 
-	 * return:  true  - appears to be a windows bootcode
-	 * 			false - does not appear to be windows bootcode
+	 * @return true  - appears to be a windows bootcode, false otherwise
 	 */
 	public boolean hasWindowsBootcode()
 	{
 		return (bootCode[0] == 0x33 && bootCode[1] == 0xC0 && bootCode[2] == 0x8E);
 	}
 
+    /**
+     * generic toString method that assembles datamembers
+     * @return a formated string
+     */
 	public String toString()
 	{
 		StringBuffer sb = new StringBuffer();

@@ -1,0 +1,13 @@
+* 02/17/09 - Verison 0.7b
+  Fixed an issue with 0.7a that prevented the vmrun path being locate in
+    Server 1.x
+
+* 02/11/09 - Version 0.7a
+  Fixed an issue with Workstation 5.x preventing LiveView from initializing
+  (thx Kevin Lang)
+
+* 01/19/09 - Version 0.7
+  Added support for Windows Vista, 2008 Server, as Guests.
+  Updated to use the VDDK vmware-mount
+  Bugfixes related to some host OS locales
+  Bugfixes related to some physical write blocker device entries
