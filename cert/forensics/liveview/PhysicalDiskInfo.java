@@ -87,5 +87,10 @@ public class PhysicalDiskInfo
 	{
 		return size;
 	}
+	
+	public String toString()
+	{
+		return "Index: " + index + " Interface: " + interfaceType + " Model: " + model + " Size: " + size;
+	}
 
 }

@@ -5,10 +5,11 @@ package cert.forensics.liveview;
  * are directed to a VMWare redo file which can be deleted (reverting all changes). 
  * 
  * Live View handles:
- * 	- Full disk images
- *  - Images of Partitions (builds a custom mbr for the partition)
- *  - Physical Hard Disks (with the aid of a usb or firewire writeblocking bridge)
- *  - Split images
+ * 	- DD style full disk images
+ *  - DD style images of partitions (builds a custom mbr for the partition)
+ *  - Hard disks (with the aid of a usb or firewire writeblocking bridge)
+ *  - Mounted images with the aid of mounting software such as Mount Image Pro
+ *  - Split dd style images
  *  - VMware Workstation or Free VMware Server
  *  
  * It allows you to:
@@ -27,8 +28,8 @@ package cert.forensics.liveview;
  * Author: 	Brian Kaplan
  * 			bfkaplan@cmu.edu
  * 
- * June 2006, Last Revised Nov 2006
- * Version 0.5
+ * June 2006, Last Revised May 2007
+ * Version 0.6
  * 
  * Copyright (C) 2006  Carnegie Mellon University
  *
@@ -59,6 +60,7 @@ import java.awt.event.*;
 import java.text.*;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Formatter;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -67,8 +69,7 @@ import java.nio.channels.FileChannel;
 import java.util.Arrays;
 
 public class LiveViewLauncher 
-{
-	
+{	
 	public  static final String 	endL = System.getProperty("line.separator");
 	
 	private static final JTextArea 	messageOutputArea = new JTextArea();	//program output area
@@ -424,14 +425,14 @@ public class LiveViewLauncher
         	    		currPDI = physicalDeviceItems[i];
         	    		displayString = currPDI.getModel() + " (" + Math.ceil(currPDI.getSize()/BYTES_PER_GIG) + " GB)";
         	    		
-        	    		if(currPDI.isRemovable())	//only add removable devices (to prevent user from selecting their currently booted partition which is dangerous)
+//        	    		if(currPDI.isRemovable())	//only add removable devices (to prevent user from selecting their currently booted partition which is dangerous)
         	    			physicalDeviceCombo.addItem(new ComboBoxItem(displayString, currPDI.getDeviceName()));
         	    	}
         	 
         			if(physicalDeviceCombo.getItemCount() > 0)		//if any items were added to the combo box
         		    	physicalDeviceCombo.setSelectedIndex(0);	//default value is the first value
         			else
-        				physicalDeviceCombo.addItem(new ComboBoxItem("No Removable Devices Detected", null));
+        				physicalDeviceCombo.addItem(new ComboBoxItem("No Suitable Disks Detected", null));
        			}
     		}
     	};
@@ -477,7 +478,7 @@ public class LiveViewLauncher
     	/* Check that the user has an up to date JVM >= global var JVM_MINIMUM_REQ */
     	String javaVersion = System.getProperty("java.version", "0.0");
     	
-    	String jvmBaseVersion = javaVersion.substring(0,javaVersion.indexOf(".") + 2);	//version string including one digit after the decimal ie 1.5
+    	String jvmBaseVersion = javaVersion.substring(0,javaVersion.indexOf(".") + 2);	//version string including one digit after the decimal eg 1.5
     	double jvmBaseVersionNum = Double.parseDouble(jvmBaseVersion);
 		LogWriter.log("Java Version: " + jvmBaseVersion);
     	if (jvmBaseVersionNum < JVM_MINIMUM_REQ)	//if JVM doesnt meet minimum requirements, alert user
@@ -504,7 +505,7 @@ public class LiveViewLauncher
     	{
 	    	Object[] options = {"Okay"};	//button titles
 		   	int answer = JOptionPane.showOptionDialog(frame, 
-						"VMware Workstation 5.5 or VMware Server 1.0 is required to run Live View" + endL + "Please visit www.vmware.com to download a copy and try again.",
+						"VMware Workstation 5.5+ or VMware Server 1.0+ is required to run Live View" + endL + "Please visit www.vmware.com to download a copy and try again.",
 						"No VMWare installation detected",
 						JOptionPane.OK_OPTION,
 						JOptionPane.ERROR_MESSAGE,
@@ -567,7 +568,7 @@ public class LiveViewLauncher
    				final String physicalDiskModel;
    				if(isPhysicalDisk)
    				{
-   					physicalDiskName = ((ComboBoxItem)physicalDeviceCombo.getSelectedItem()).getUnderlyingValue();	// \\.\PhsycialDiskX
+   					physicalDiskName = ((ComboBoxItem)physicalDeviceCombo.getSelectedItem()).getUnderlyingValue();	// \\.\PhysicalDiskX
    					physicalDiskModel = ((ComboBoxItem)physicalDeviceCombo.getSelectedItem()).getDisplayText();	//physical disk model string
    				}
    				else
@@ -757,7 +758,7 @@ public class LiveViewLauncher
 	            		}
 	            		catch(IOException ioe)
 	            		{
-	            			System.out.println("I/O problem reading physical device: " + deviceName + " " + ioe.getMessage());
+	            			postError("I/O problem reading physical device: " + deviceName + " " + ioe.getMessage());
 	            		}
 	            		
 	            		tmp512 = new MasterBootRecord(unsignedMBRBuffer);
@@ -793,6 +794,11 @@ public class LiveViewLauncher
 						postOutput("Detected Partition Image" + endL);
 					}
    				
+   					if(isPhysicalDisk && !isFullDisk)	//physical partitions are not handled (eg mounting partition in PDE)
+   					{
+   						throw new LiveViewException("Live View cannot boot physical partitions. If you are using mounting software, make sure to mount the full disk image." + endL);
+   					}
+   					
    	   				if(!isPhysicalDisk)
    	   				{
 	   					/* check if any files in the image are not readonly */
@@ -1153,7 +1159,7 @@ public class LiveViewLauncher
 	   								if(totalSectors >= mbr.totalSectorsFromPartitions())
 	   									unallocatedSpace = totalSectors - mbr.totalSectorsFromPartitions() - 63;	//standard way to get unallocated space (sectors in file - sectors in mbr)
 	   								else
-	   									unallocatedSpace = mbr.totalSectorsFromPartitions() - totalSectors + 63; //added because sometimes total sectors making up file is less than total in mbr for partitions (ie nist image) so here we account for unallocated
+	   									unallocatedSpace = mbr.totalSectorsFromPartitions() - totalSectors + 63; //added because sometimes total sectors making up file is less than total in mbr for partitions (eg nist image) so here we account for unallocated
 	   							}
 	   							else	//not a chunked full disk image
 	   							{
@@ -1164,8 +1170,8 @@ public class LiveViewLauncher
 	   								}
 	   								else	//full disk dd image
 	   								{
-	   									vmdkBuffer.append("RW " + mbr.totalSectorsFromPartitions() + " FLAT " + "\"" + imgFiles[0] + "\"" + " 0" + endL);	//just need one extent line pointing to whole image file
-	   	   	   	   						unallocatedSpace = mbr.totalSectorsOnDiskFromFile() - mbr.totalSectorsFromPartitions() - mbr.getBootablePartition().getEndSector() + 63;	//add 63?
+	   									vmdkBuffer.append("RW " + (mbr.totalSectorsFromPartitions() + 63) + " FLAT " + "\"" + imgFiles[0] + "\"" + " 0" + endL);	//just need one extent line pointing to whole image file
+	   	   	   	   						unallocatedSpace = mbr.totalSectorsOnDiskFromFile() - mbr.totalSectorsFromPartitions() /*- mbr.getBootablePartition().getEndSector()*/ + 63;	//add 63?
 	   								}
 	   							}
 	   						}
@@ -1679,7 +1685,7 @@ public class LiveViewLauncher
     	boolean isXP2Kor2K3 = OperatingSystem.isNTKernel(os.getVmGuestOS());	//doesnt include original NT
     	
     	//TODO Strange problem when clear passwords is checked for NT, it bluescreens on boot -- without it is fine (maybe mount/unmount happens too fast?)
-    	if(isXP2Kor2K3 /*|| isOriginalNT*/)	//if OS is NT kernel based or original NT (ie NT4.0)
+    	if(isXP2Kor2K3 /*|| isOriginalNT*/)	//if OS is NT kernel based or original NT (eg NT4.0)
     	{
 	    	
 	    	if(!isOriginalNT)
@@ -1733,10 +1739,17 @@ public class LiveViewLauncher
 		    		return null;
 		    	}
 		    	
-		    	//merge registry entries to loaded hive
-		    	String mergeFileLoc = InternalConfigStrings.getString("LiveViewLauncher.MergeFileLocation");
+		    	int currentControlSetVal = getCurrentControlSet();
+		    	if(currentControlSetVal == -1)	//failed to extract control set
+		    		postError("Failed to extract CurrentControlSet value from guest registry");
+		    	else
+		    		postOutput("Extracted Current Control Set Value: " + currentControlSetVal + endL);
 		    	
-		    	if(makeChangesToRegistry(mergeFileLoc))	
+		    	
+		    	//merge registry entries to loaded hive
+		    	String mergeTemplateLoc = InternalConfigStrings.getString("LiveViewLauncher.MergeFileLocation");
+		    	
+		    	if(makeChangesToRegistry(mergeTemplateLoc, currentControlSetVal))	
 		    	{
 		    		postOutput("Critical Device Database Updated" + endL);
 		    	}
@@ -1851,7 +1864,7 @@ public class LiveViewLauncher
 			bw.flush();
 			bw.close();
 			
-			//check for exit val - ie any errors
+			//check for exit val - eg any errors
 			int exitVal = externalProc.waitFor();
 			
 			LogWriter.log("External Proc Output: " + stdOutReader.getReturnText());
@@ -1959,14 +1972,47 @@ public class LiveViewLauncher
      * 
      * Precondition: system hive from image is already loaded into local system registry under HKLM\NEWSYSTEM
      */
-    private static boolean makeChangesToRegistry(String mergeFileLoc)
+    private static boolean makeChangesToRegistry(String mergeTemplateLoc, int currentControlSetVal)
     {   	
+    	File tempMergeFile = null;
+    	
+    	//read in merge template line by line
+        StringBuffer mergeTemplateBuffer = new StringBuffer();
+    	try
+        {
+            DataInputStream in = new DataInputStream(new FileInputStream(mergeTemplateLoc));
+            BufferedReader br = new BufferedReader(new InputStreamReader(in));
+            String currLine = null;
+            while((currLine = br.readLine()) != null)   
+            	mergeTemplateBuffer.append(currLine + endL);
+            in.close();
+
+            //pad the control set val to make it 3 chars long
+            String controlSetString = "ControlSet"  + new Formatter().format("%03d", currentControlSetVal).toString();
+            
+            //replace the control set placeholder with the actual current control set
+            String finalMergeFileString = mergeTemplateBuffer.toString().replaceAll("<CurrentControlSet>", controlSetString);
+            
+            //write modified merge file contents to temp merge file
+          	tempMergeFile = new File(mergeTemplateLoc + ".temp");
+            FileWriter outWriter = new FileWriter(tempMergeFile);
+            outWriter.write(finalMergeFileString);
+            outWriter.close();
+        }
+    	catch(IOException ioe)
+    	{
+    		postError("I/O Error while creating merge file from template. Guest registry could not be updated" + endL + ioe.getMessage());
+    		return false;   		
+    	}
+
+    	//run temporary merge file
       	String[] cmd = new String[3];
     	cmd[0] = "regedit";
     	cmd[1] = "/s";	
-    	cmd[2] = mergeFileLoc;
+    	cmd[2] = tempMergeFile.getAbsolutePath();
     	
     	String stdOut = callExternalProcess(cmd);
+    	tempMergeFile.delete();  //delete temporary merge file
     	if(stdOut == null)
     		return false;
     	return true;
@@ -2389,11 +2435,37 @@ public class LiveViewLauncher
 		}
 	}
 	
+	/* 
+	 * Precondition: Registry is already loaded and will be unloaded after method returns 
+	 * return null means failure querying registry
+	 */
+	private static int getCurrentControlSet()
+	{
+    	//search registry key HKLM\NEWSYSTEM\Select\Current to find the current control set number
+        String regData = queryRegistry("HKLM\\NEWSYSTEM\\Select",
+										"Current",
+										"REG_DWORD");
+
+        if(regData != null)
+        {
+        	try
+        	{
+        		return  Integer.parseInt(regData.substring(2,regData.length()), 16); 	//chop off hex value are convert to int;
+        	}
+        	catch(NumberFormatException nfe)
+        	{
+        		postError("CurrentControlSet is not an integer");
+        		return -1;
+        	}
+        } 
+        return -1;			//some sort of failure to extract value
+	}
+
 	/*
 	 * Extracts the disk serial number from the registry
 	 * 
 	 * This is necessary for building the mbr for partitions because the disk serial number
-	 * is used by some operating systems to maintain the drive to letter mappings (ie the bootable
+	 * is used by some operating systems to maintain the drive to letter mappings (eg the bootable
 	 * is 'c:') Without the correct serial number in the mbr, the OS may not be able to find that mapping
 	 * in the registry and may hang when trying to boot. 
 	 */
@@ -2444,8 +2516,15 @@ public class LiveViewLauncher
 	    		postOutput("Loaded System Hive For Disk Serial Number: " + endL);
 		}
     	
+		//get current control set value to pass to boo drive letter
+    	int currentControlSetVal = getCurrentControlSet();
+    	if(currentControlSetVal == -1)	//failed to extract control set
+    		postError("Failed to extract CurrentControlSet value from guest registry necessary for extracting boot drive letter");
+//    	else
+//    		postOutput("Extracted Current Control Set Value: " + currentControlSetVal + endL);
+		
     	//get registry key and parse out boot drive letter (mounted snapshot and registry should be open and loaded already from prepareForLaunch())
-    	bootDriveLetter = getBootDriveLetter();	
+    	bootDriveLetter = getBootDriveLetter(currentControlSetVal);	
     	
     	if(bootDriveLetter != null)
     	{
@@ -2516,10 +2595,13 @@ public class LiveViewLauncher
 	 * Precondition: Registry is already loaded and will be unloaded after method returns 
 	 * return null means failure querying registry
 	 */
-	private static String getBootDriveLetter()
+	private static String getBootDriveLetter(int controlSetVal)
 	{
-    	//search registry key HKLM\NEWSYSTEM\ControlSet001\Control\ContentIndex\DllsToRegister to find bootable drive letter
-        String regData = queryRegistry("HKLM\\NEWSYSTEM\\ControlSet001\\Control\\ContentIndex",
+		//pad control set value in string with 3 chars
+        String controlSetString = "ControlSet"  + new Formatter().format("%03d", controlSetVal).toString();
+
+    	//search registry key HKLM\NEWSYSTEM\<CurrentControlSet>\Control\ContentIndex\DllsToRegister to find bootable drive letter
+        String regData = queryRegistry("HKLM\\NEWSYSTEM\\" + controlSetString + "\\Control\\ContentIndex",
 										"DllsToRegister",
 										"REG_MULTI_SZ");
 
@@ -2549,17 +2631,29 @@ public class LiveViewLauncher
 	 */
 	private static String getNextFreeDriveLetter(char startVal)
 	{
-    	File testMountDriveLetter; 
-    	char curLetter = startVal;
+    	char candidateDriveLetter = startVal;
+    	File[] usedDriveLetters = File.listRoots();	
     	
-    	while(curLetter <= 'z')
+    	String 	currDriveLetterInUse; 
+
+    	while(candidateDriveLetter <= 'z')	//for all candidate drive letters
     	{
-    		testMountDriveLetter = new File(curLetter + ":");
-        	if(!testMountDriveLetter.isDirectory())
-        		return Character.toString(curLetter);	//found open drive
-        	curLetter++;	//try next character
+    		//check if current candidate matches any drive letters in use
+    		boolean isCandidateInUse = false;
+	    	for(int i = 0; i < usedDriveLetters.length; i++) //for all used drive letters
+	    	{
+	    		currDriveLetterInUse = usedDriveLetters[i].getPath().substring(0,1);
+	    		if(Character.toString(candidateDriveLetter).equalsIgnoreCase(currDriveLetterInUse))
+	    		{
+	    			isCandidateInUse = true;
+	    			break;	//candidate matches a drive letter in use, so go to next candidate
+	    		}
+	    	}
+	    	if(!isCandidateInUse) //if candidate is free, return it
+	    		return Character.toString(candidateDriveLetter);
+	    	candidateDriveLetter++;
     	}
-    	return null;	//error, all drive letter used
+    	return null;	//error, all drive letters are being used
 	}
 	
 	/*
@@ -2687,6 +2781,7 @@ public class LiveViewLauncher
 	
 	/*
 	 * Query WMI Interface for physical devices attached to machine
+	 * Also checks each physical device on the system to catch devices not reported in WMI (eg w/ MIP)
 	 * 
 	 * Returns array of combo box items representing the display string and underlying physical device address value pairs
 	 * null indicates the query failed could not be found
@@ -2697,8 +2792,9 @@ public class LiveViewLauncher
 		ArrayList diskInfoList = new ArrayList();
 		PhysicalDiskInfo[] returnVal = null;
 		
-		Map validDeviceIndexMapping = getUsbAndFirewireDeviceIndexMapping();
+		Map validDeviceIndexMapping = getIndexInterfaceDeviceMapping();
 		Map indexModelMapping = getIndexModelNameDeviceMapping(validDeviceIndexMapping);
+		int hostBootDriveIndex = getHostBootDriveIndex();
 		
 		//get the index and size of each physical device attached to machine
 		//wmic /namespace:\\root\cimv2 path Win32_DiskDrive get index, size
@@ -2722,10 +2818,11 @@ public class LiveViewLauncher
 		double diskSize;
 		
 		String line;
+		//parse index/size mapping
         for(int i = 0; i < outputLines.length; i++)	//for every output line
         {
         	line = outputLines[i].trim();
-        	if(!line.startsWith("Index") && !line.equals(""))	//if line is not a column header line
+        	if(!line.startsWith("Index") && !line.equals(""))	//if line is not a column header 
         	{	
         		deviceIndex = line.substring(0,1);	//extract index of this device
         		LogWriter.log("Device Index: " + deviceIndex);
@@ -2737,20 +2834,143 @@ public class LiveViewLauncher
         		{
         			diskSize = Double.parseDouble(sizeString);	//extract size of disk for this index
 
-	        		if(indexModelMapping.containsKey(new Integer(deviceIndex)) && validDeviceIndexMapping.containsKey(new Integer(deviceIndex)))	//if current device is one in the indexmodel mapping (it is valid)
-	        		{
-	        			String model = (String)indexModelMapping.get(new Integer(deviceIndex));
-	        			String interfaceType = (String)validDeviceIndexMapping.get(new Integer(deviceIndex));
-	            		PhysicalDiskInfo pdi = new PhysicalDiskInfo(deviceIndex, interfaceType, model, diskSize);
-	            		diskInfoList.add(pdi);
-	        		}
-	        		else
-	        		{
-	        			LogWriter.log("****WARNING: Current Device is not in indexModelMapping");
-	        		}
+        			if(diskSize > 0)	//sometimes size is reported as 0 for card readers and the like -- exclude these
+        			{
+		        		if(indexModelMapping.containsKey(new Integer(deviceIndex)) && validDeviceIndexMapping.containsKey(new Integer(deviceIndex)))	//if current device is one in the indexmodel mapping (it is valid)
+		        		{
+		        			String model = (String)indexModelMapping.get(new Integer(deviceIndex));
+		        			String interfaceType = (String)validDeviceIndexMapping.get(new Integer(deviceIndex));
+		             		PhysicalDiskInfo pdi = new PhysicalDiskInfo(deviceIndex, interfaceType, model, diskSize);
+		            		
+		            		if(!pdi.getIndex().equals(Integer.toString(hostBootDriveIndex)))	//skip host boot drive
+		            		{
+		            			
+		                    	String wmiPhysicalDriveString = "\\\\.\\PhysicalDrive" + deviceIndex;
+		                    	RandomAccessFile wmiPhysicalDriveHandle;
+
+		                		int[] unsignedTempMBRBuffer = null;
+		        				try
+		        				{
+		            				wmiPhysicalDriveHandle = new RandomAccessFile(wmiPhysicalDriveString, "r");
+
+		        					//read physical drive handle to get mbr and calculate total disk size
+		                		    byte[] tempMbrBuffer = new byte[512];	//signed mbr bytes
+		                		    wmiPhysicalDriveHandle.readFully(tempMbrBuffer);	
+		                		    wmiPhysicalDriveHandle.close();
+		                		    unsignedTempMBRBuffer = new int[512];	//unsigned bytes from mbr
+		                		    for(int x = 0; x < 512; x++)	//convert signed bytes to unsigned
+		                		    {
+		                		    	unsignedTempMBRBuffer[x] = tempMbrBuffer[x];
+		                		    	if(tempMbrBuffer[x] < 0)
+		                		    		unsignedTempMBRBuffer[x] = 256 + tempMbrBuffer[x];
+		                		    }
+		                		}
+		                		catch(FileNotFoundException fnf)        		
+		                		{
+		                			logError("Could not open physical device: " + wmiPhysicalDriveString + " " + fnf.getMessage());
+		                			continue;
+		                		}
+		                		catch(IOException ioe)
+		                		{
+		                			logError("I/O problem reading physical device: " + wmiPhysicalDriveString + " " + ioe.getMessage());
+		                			continue;
+		                		}
+		                		
+		                		//if physical drive has a valid mbr, add it to the list of devices
+		                		MasterBootRecord tmpMbr = new MasterBootRecord(unsignedTempMBRBuffer);
+		                		if(tmpMbr.isValidMBR())
+		                		{
+		                			LogWriter.log("Added " + wmiPhysicalDriveString + " detected via WMI with valid MBR to list of devices" + endL);
+		                			diskInfoList.add(pdi);	//add it to list of disks
+		                		}
+		                		else
+		                			LogWriter.log("Skipped " + wmiPhysicalDriveString + " detected with WMI because it has an invalid MBR");
+		            		}
+		            		else
+		            			LogWriter.log("Excluded Device Index: " + deviceIndex + " because it is the host boot drive");
+		        		}
+		        		else
+		        			LogWriter.log("WARNING: Current Device " + deviceIndex + " is not in indexModelMapping");
+        			}
+        			else
+        				LogWriter.log("Skipped Device: " + deviceIndex + " detected w/ WMI because a size of 0 was reported");
         		}
+        		else
+        			LogWriter.log("Skipped Device: " + deviceIndex + " detected w/ WMI because no size was reported");
         	}
         }
+        
+        //now iterate through all physical devices to find ones not reported by wmi because
+        //of not relating logical to physical device (eg MIP)
+        final int MAX_PHYS_DRIVE_NUM = 20;
+        String physicalDriveString;
+        for(int i = 0; i < MAX_PHYS_DRIVE_NUM; i++)	
+        {
+        	if(i == hostBootDriveIndex)	//skip physical drive if it is the host os drive
+        		continue;
+        	
+        	physicalDriveString = "\\\\.\\PhysicalDrive" + i;
+        	RandomAccessFile physicalDriveHandle;
+			try
+			{
+				physicalDriveHandle = new RandomAccessFile(physicalDriveString, "r");
+	        	physicalDriveHandle.getFD();	//try to get file descriptor (this will fail if phys drive doesnt exist)
+			}
+			catch (FileNotFoundException fnf)	
+			{	
+    			logError("Could not open physical device:  " + physicalDriveString + " " + fnf.getMessage());
+				continue;
+			}
+			catch (IOException ioe)
+			{
+    			logError("I/O problem reading physical device:  " + physicalDriveString + " " + ioe.getMessage());
+				continue;
+			}        	
+			
+			//found an actual physical device, check if we already found it with WMI 
+			if(!indexModelMapping.containsKey(new Integer(i)))	//if we havent already found it with WMI
+			{
+        		PhysicalDiskInfo pdi;
+        		int[] unsignedTempMBRBuffer = null;
+				try
+				{
+					//read physical drive handle to get mbr and calculate total disk size
+        		    byte[] tempMbrBuffer = new byte[512];	//signed mbr bytes
+        		    physicalDriveHandle.readFully(tempMbrBuffer);	
+        		    physicalDriveHandle.close();
+        		    unsignedTempMBRBuffer = new int[512];	//unsigned bytes from mbr
+        		    for(int x = 0; x < 512; x++)	//convert signed bytes to unsigned
+        		    {
+        		    	unsignedTempMBRBuffer[x] = tempMbrBuffer[x];
+        		    	if(tempMbrBuffer[x] < 0)
+        		    		unsignedTempMBRBuffer[x] = 256 + tempMbrBuffer[x];
+        		    }
+        		}
+        		catch(FileNotFoundException fnf)        		
+        		{
+        			logError("Could not open physical device: " + physicalDriveString + " " + fnf.getMessage());
+        			continue;
+        		}
+        		catch(IOException ioe)
+        		{
+        			logError("I/O problem reading physical device: " + physicalDriveString + " " + ioe.getMessage());
+        			continue;
+        		}
+        		
+        		//if physical drive has a valid mbr, add it to the list of devices
+        		MasterBootRecord tmpMbr = new MasterBootRecord(unsignedTempMBRBuffer);
+        		if(tmpMbr.isValidMBR())
+        		{
+        			double physicalDriveSizeBytes = tmpMbr.totalSectorsFromPartitions() * 512;
+        			LogWriter.log("Added " + physicalDriveString + " not detected by WMI to list of physical devices" + endL);
+        			pdi = new PhysicalDiskInfo(Integer.toString(i), "IDE", "Hard Disk " + i, physicalDriveSizeBytes);
+        			diskInfoList.add(pdi);	//add it to list of disks
+        		}
+        		else
+        			LogWriter.log("Skipped " + physicalDriveString + " because it has an invalid MBR");
+			}
+        }
+       
 		//convert arraylist into array of PhysicalDiskInfo structures
 		returnVal = new PhysicalDiskInfo[diskInfoList.size()];
 	    for(int i = 0; i < diskInfoList.size(); i++)
@@ -2763,13 +2983,59 @@ public class LiveViewLauncher
 	}
 	
 	/*
+	 * Query WMI Interface for drive index of host's boot disk 
+	 * 
+	 * Returns drive index for host OS 
+	 * -1 indicates the query failed
+	 * 
+	 */
+	private static int getHostBootDriveIndex()
+	{
+		//wmic /namespace:\\root\cimv2 path Win32_LogicalDisk where DeviceID="<boot_drive_letter>:" assoc /RESULTCLASS:WIN32_DiskPartition
+    	String[] cmd = new String[8];
+    	cmd[0] = "wmic";
+    	cmd[1] = "/namespace" + ":\\\\root\\cimv2";	
+    	cmd[2] = "path";
+    	cmd[3] = "Win32_LogicalDisk";
+    	cmd[4] = "where";
+    	cmd[5] = "DeviceID=" + '"' + System.getenv("SystemDrive") + '"';
+    	cmd[6] = "assoc";
+    	cmd[7] = "/RESULTCLASS:Win32_DiskPartition";
+		
+		String outputBuffer = callExternalProcess(cmd);
+		
+		if(outputBuffer == null)
+			return -1;
+		
+		String[] outputLines = outputBuffer.split(System.getProperty("line.separator"));
+    		
+		int deviceIndex = -1;
+		
+		String line;
+        for(int i = 0; i < outputLines.length; i++)	//for every output line
+        {
+        	line = outputLines[i].trim();
+
+    		String prefix = "Win32_DiskPartition.DeviceID=" + '"' + "Disk #";
+    		int beginningOfIndex = line.indexOf(prefix);	//beginning of prefix in line of output
+    		if(beginningOfIndex > 0)	//found prefix
+    		{
+    			deviceIndex = Integer.parseInt(line.substring(beginningOfIndex + prefix.length(), beginningOfIndex + prefix.length() + 1));	//extract index value
+    			LogWriter.log("Bootable device is index: " + deviceIndex);  			
+    		}
+        }
+        return deviceIndex;	
+	}
+	
+	
+	/*
 	 * Query WMI Interface for physical devices attached to machine that are USB or Firewire Interface
 	 * 
 	 * Returns mapping of all USB and firewire device indices mapped to their interface type (usb or firewire)
 	 * null indicates the query failed
 	 * 
 	 */
-	private static Map getUsbAndFirewireDeviceIndexMapping()
+	private static Map getIndexInterfaceDeviceMapping()
 	{
 		Map deviceIndexMap = new HashMap();	//mapping of device index to interface
 		
@@ -2803,8 +3069,8 @@ public class LiveViewLauncher
         		interfaceType = line.substring(1,line.length()).trim();	//extract interface type for this index
         		
         		//if we found a usb or firewire interface 
-        		if(interfaceType.equalsIgnoreCase("USB") || interfaceType.equalsIgnoreCase("1394"))
-        			deviceIndexMap.put(new Integer(deviceIndex),interfaceType);	//add the device index to the list of usb/1394 device indices
+//        		if(interfaceType.equalsIgnoreCase("USB") || interfaceType.equalsIgnoreCase("1394"))
+        			deviceIndexMap.put(new Integer(deviceIndex),interfaceType);	//add the device index to the list 
         	}
         }
 
@@ -2849,8 +3115,11 @@ public class LiveViewLauncher
         	if(!line.startsWith("Index") && !line.equals(""))	//if line is not a column header line
         	{	
         		deviceIndex = Integer.parseInt(line.substring(0,1));	//extract index of this device
-        		modelName = line.substring(1,line.length()).trim();	//extract model name for this index
+        		modelName = line.substring(1,line.length()).trim();		//extract model name for this index
         		
+        		if(modelName.length() <= 0)	//if no model name is reported by WMI, make a generic one (eg with PDE)
+        			modelName = "Hard Disk " + deviceIndex;
+        			
         		//only add to map if current device index is a valid one
         		Set validDeviceIndices = validDeviceIndexMapping.keySet();
         		Iterator indexIterator = validDeviceIndices.iterator();
@@ -2860,9 +3129,10 @@ public class LiveViewLauncher
         			if(deviceIndex == currValidIndex)	//device index is valid
         				indexToModelNameMap.put(new Integer(deviceIndex), modelName);
         		}
+
         	}
         }
-
+        
 	    return indexToModelNameMap;
 	}
 	
@@ -2969,15 +3239,23 @@ public class LiveViewLauncher
 	}
 	
 	/*
-	 * Posts an error message to the GUI output area
+	 * Posts an error message to the GUI output area and writes it to the log
 	 */
-	public static void postError(String line)	//write an error message
+	public static void postError(String line)
 	{
 		LogWriter.log("Error: " + line);
 		messageOutputArea.append("ERROR>     " + line + endL);	//write the error message to out window
 		messageOutputArea.setCaretPosition(messageOutputArea.getText().length());	//scroll down
 	}
 
+	/*
+	 * Writes error message to log file
+	 */
+	public static void logError(String line)
+	{
+		LogWriter.log("Error: " + line);
+	}
+	
 	/*
 	 * Utility method used for posting output messages to the GUI output area
 	 */

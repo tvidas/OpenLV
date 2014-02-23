@@ -1,11 +1,12 @@
+!include "WordFunc.nsh"
+!insertmacro VersionCompare
 
 !define PRODUCT_NAME "Live View"
-!define PRODUCT_VERSION "0.5"
+!define PRODUCT_VERSION "0.6"
 
 ;Government or Public
 !define PRODUCT_EDITION "Public"
 !define BASE_DIRECTORY "${PRODUCT_VERSION}\LiveView_${PRODUCT_VERSION}_${PRODUCT_EDITION}"
-
 
 !define PRODUCT_PUBLISHER "CERT Forensics Lab"
 !define PRODUCT_WEB_SITE "http://liveview.sourceforge.net"
@@ -13,9 +14,10 @@
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 !define PRODUCT_UNINST_ROOT_KEY "HKLM"
 
-!define JRE_VERSION "1.5"
+!define JRE_MIN_VERSION "1.5"
 !define JRE_URL "http://dlc.sun.com/jdk/jre-1_5_0_01-windows-i586-p.exe"
-!define VMWARE_SERVER_URL "http://download3.vmware.com/software/vmserver/VMware-server-installer-1.0.0-28343.exe"
+!define VMWARE_SERVER_URL "http://download3.vmware.com/software/vmserver/VMware-server-installer-1.0.3-44356.exe"
+;!define VMWARE_SERVER_URL "http://download3.vmware.com/software/vmserver/VMware-server-installer-1.0.0-28343.exe"
 !define VMWARE_MOUNT_URL "http://download3.vmware.com/software/wkst/VMware-mount-5.5.0-18463.exe"
 
 
@@ -126,7 +128,7 @@ Function GetVMware
 
         IfFileExists "$EXEDIR\${VMWARE_INSTALLER_NAME}" foundvmware
 
-        MessageBox MB_OK|MB_ICONINFORMATION "${PRODUCT_NAME} reqires either VMware Server 1.0 or VMware Workstation 5.5. The free VMware Server 1.0 will \
+        MessageBox MB_OK|MB_ICONINFORMATION "${PRODUCT_NAME} reqires either VMware Server 1.0+ or VMware Workstation 5.5+. The free VMware Server will \
                                           now be downloaded and installed because no compatible VMware installation could be detected on your system"
 
         StrCpy $2 "$TEMP\${VMWARE_INSTALLER_NAME}"
@@ -140,7 +142,7 @@ Function GetVMware
         Goto done
         
         foundvmware:
-        Messagebox MB_OK|MB_ICONINFORMATION "${PRODUCT_NAME} reqires either VMware Server 1.0 or VMware Workstation 5.5. The free VMware Server 1.0 will \
+        Messagebox MB_OK|MB_ICONINFORMATION "${PRODUCT_NAME} reqires either VMware Server 1.0+ or VMware Workstation 5.5+. The free VMware Server will \
                                           now be installed from your installation media because no compatible VMware installation could be detected on your system"
 
         ExecWait "$EXEDIR\${VMWARE_INSTALLER_NAME}"
@@ -178,7 +180,11 @@ FunctionEnd
 Function DetectJRE
   ReadRegStr $2 HKLM "SOFTWARE\JavaSoft\Java Runtime Environment" \
              "CurrentVersion"
-  StrCmp $2 ${JRE_VERSION} done
+  
+  ${VersionCompare} $2 ${JRE_MIN_VERSION} $R0
+  
+  IntCmp $R0 1 done
+  IntCmp $R0 0 done
 
   Call GetJRE
 

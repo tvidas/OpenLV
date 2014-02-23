@@ -1,34 +1,36 @@
 Windows Registry Editor Version 5.00
 
-[HKEY_LOCAL_MACHINE\NEWSYSTEM\ControlSet001\Control\CriticalDeviceDatabase\pci#ven_8086&dev_1222]
+[HKEY_LOCAL_MACHINE\NEWSYSTEM\<CurrentControlSet>\Control\CriticalDeviceDatabase\pci#ven_8086&dev_1222]
 "ClassGUID"="{4D36E96A-E325-11CE-BFC1-08002BE10318}"
 "Service"="intelide"
 
-[HKEY_LOCAL_MACHINE\NEWSYSTEM\ControlSet001\Control\CriticalDeviceDatabase\pci#ven_8086&dev_1230]
+[HKEY_LOCAL_MACHINE\NEWSYSTEM\<CurrentControlSet>\Control\CriticalDeviceDatabase\pci#ven_8086&dev_1230]
 "ClassGUID"="{4D36E96A-E325-11CE-BFC1-08002BE10318}"
 "Service"="intelide"
 
-[HKEY_LOCAL_MACHINE\NEWSYSTEM\ControlSet001\Control\CriticalDeviceDatabase\pci#ven_8086&dev_2411]
+[HKEY_LOCAL_MACHINE\NEWSYSTEM\<CurrentControlSet>\Control\CriticalDeviceDatabase\pci#ven_8086&dev_2411]
 "ClassGUID"="{4D36E96A-E325-11CE-BFC1-08002BE10318}"
 "Service"="intelide"
 
-[HKEY_LOCAL_MACHINE\NEWSYSTEM\ControlSet001\Control\CriticalDeviceDatabase\pci#ven_8086&dev_2421]
+[HKEY_LOCAL_MACHINE\NEWSYSTEM\<CurrentControlSet>\Control\CriticalDeviceDatabase\pci#ven_8086&dev_2421]
 "ClassGUID"="{4D36E96A-E325-11CE-BFC1-08002BE10318}"
 "Service"="intelide"
 
-[HKEY_LOCAL_MACHINE\NEWSYSTEM\ControlSet001\Control\CriticalDeviceDatabase\pci#ven_8086&dev_7010]
+[HKEY_LOCAL_MACHINE\NEWSYSTEM\<CurrentControlSet>\Control\CriticalDeviceDatabase\pci#ven_8086&dev_7010]
 "ClassGUID"="{4D36E96A-E325-11CE-BFC1-08002BE10318}"
 "Service"="intelide"
 
-[HKEY_LOCAL_MACHINE\NEWSYSTEM\ControlSet001\Control\CriticalDeviceDatabase\pci#ven_8086&dev_7111]
+[HKEY_LOCAL_MACHINE\NEWSYSTEM\<CurrentControlSet>\Control\CriticalDeviceDatabase\pci#ven_8086&dev_7111]
 "ClassGUID"="{4D36E96A-E325-11CE-BFC1-08002BE10318}"
 "Service"="intelide"
 
-[HKEY_LOCAL_MACHINE\NEWSYSTEM\ControlSet001\Control\CriticalDeviceDatabase\pci#ven_8086&dev_7199]
+[HKEY_LOCAL_MACHINE\NEWSYSTEM\<CurrentControlSet>\Control\CriticalDeviceDatabase\pci#ven_8086&dev_7199]
 "ClassGUID"="{4D36E96A-E325-11CE-BFC1-08002BE10318}"
 "Service"="intelide"
 
-[HKEY_LOCAL_MACHINE\NEWSYSTEM\ControlSet001\Services\IntelIde]
+;Add driver for intelide (requires intelide.sys in drivers directory)
+
+[HKEY_LOCAL_MACHINE\NEWSYSTEM\<CurrentControlSet>\Services\IntelIde]
 "ErrorControl"=dword:00000001
 "Group"="System Bus Extender"
 "Start"=dword:00000000

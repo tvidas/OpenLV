@@ -61,6 +61,4 @@ public class ComboBoxItem
 	{
 		this.underlyingValue = underlyingValue;
 	}
-	
-	
 }
