@@ -1,8 +1,7 @@
 package cert.forensics.liveview;
 /*
- * Generic exception for various problems class
- * Thrown for any problem encountered while preparing to 
- * boot the disk image 
+ * A log formatter that removes all of the metadata typically associated with a log
+ * entry and simply prints the log messages (for readability)
  * 
  * Author: 	Brian Kaplan
  * 			bfkaplan@cmu.edu
@@ -24,15 +23,15 @@ package cert.forensics.liveview;
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  * 
  */
+import java.util.logging.Formatter;
+import java.util.logging.LogRecord;
 
-public class LiveViewException extends Throwable
+public class MinimalLogFormatter extends Formatter
 {
-	LiveViewException()
-	{}
-
-	LiveViewException(String msg)
+	// This method is called for every log records
+	public String format(LogRecord rec)
 	{
-		super(msg);
-		LogWriter.log("Exception: " + msg);
+		return formatMessage(rec) + System.getProperty("line.separator");
 	}
+
 }

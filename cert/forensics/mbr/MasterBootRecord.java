@@ -42,10 +42,11 @@ public class MasterBootRecord
 	private PartitionEntry partitionEntry4;
 	private int[] marker;
 	private long fileSizeBytes;	
+	private int[] mbrUnsignedBytes;
 	
 	public MasterBootRecord(File image)
 	{
-		int[] mbrUnsignedBytes = new int[512];
+		mbrUnsignedBytes = new int[512];
 		
 		fileSizeBytes = image.length();
 		
@@ -73,6 +74,7 @@ public class MasterBootRecord
 
 	private void initialize(int[] mbrUnsignedBytes)
 	{
+		this.mbrUnsignedBytes = mbrUnsignedBytes;
 		//carve out CODE_SIZE bytes from image
 		bootCode = new int[BOOT_CODE_SIZE];
 		for(int i = 0; i < BOOT_CODE_SIZE; i++)
@@ -213,5 +215,34 @@ public class MasterBootRecord
 	public boolean hasWindowsBootcode()
 	{
 		return (bootCode[0] == 0x33 && bootCode[1] == 0xC0 && bootCode[2] == 0x8E);
+	}
+
+	public String toString()
+	{
+		StringBuffer sb = new StringBuffer();
+		for(int i = 0; i <  mbrUnsignedBytes.length; i++)
+		{
+			if(i % 16 == 0)
+				sb.append(System.getProperty("line.separator"));
+			if(mbrUnsignedBytes[i] < 16)
+				sb.append("0" + Integer.toHexString(mbrUnsignedBytes[i]) + " ");	//pad 0-F with leading 0
+			else
+				sb.append(Integer.toHexString(mbrUnsignedBytes[i]) + " ");	//print two char hex val 0-255
+		}
+		sb.append(System.getProperty("line.separator"));
+		sb.append("Partition 1:" + System.getProperty("line.separator"));
+		sb.append("====================" + System.getProperty("line.separator"));
+		sb.append(partitionEntry1.toString());
+		sb.append("Partition 2:" + System.getProperty("line.separator"));
+		sb.append("====================" + System.getProperty("line.separator"));
+		sb.append(partitionEntry2.toString());
+		sb.append("Partition 3:" + System.getProperty("line.separator"));
+		sb.append("====================" + System.getProperty("line.separator"));
+		sb.append(partitionEntry3.toString());
+		sb.append("Partition 4:" + System.getProperty("line.separator"));
+		sb.append("====================" + System.getProperty("line.separator"));
+		sb.append(partitionEntry4.toString());
+		
+		return sb.toString();
 	}
 }

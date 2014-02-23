@@ -25,10 +25,10 @@ package cert.forensics.liveview;
  * modifications to VM redo, launches the VM, etc. 
  * 
  * Author: 	Brian Kaplan
- * 			bfkaplan@andrew.cmu.edu
+ * 			bfkaplan@cmu.edu
  * 
- * June 2006, Last Revised August 2006
- * Version 0.4
+ * June 2006, Last Revised Nov 2006
+ * Version 0.5
  * 
  * Copyright (C) 2006  Carnegie Mellon University
  *
@@ -59,6 +59,10 @@ import java.awt.event.*;
 import java.text.*;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
 
@@ -72,7 +76,7 @@ public class LiveViewLauncher
 	private static Process 			externalProc;	//external process(es) that are called throughout
 	private static final Date 		now = new Date();	//current time/date
 	
-	private static final String 	dateFormat = InternalConfigStrings.getString("LiveViewLauncher.SystemTimeFormat");
+//	private static final String 	dateFormat = InternalConfigStrings.getString("LiveViewLauncher.SystemTimeFormat");
 	private static final String 	PARENT_DISK_SIZE_GB = "950";	//parent disk size for partitions (arbitrary large size -- was previously a user supplied value)
 	private static		 String 	guestOSTypeText;	
 	
@@ -86,9 +90,12 @@ public class LiveViewLauncher
 	private static final String		VMWARE_MOUNT_PATH	= queryRegistryForVMMountPath();
 	private static final double		JVM_MINIMUM_REQ		= 1.5;			//requires jvm 1.5 or higher
 	private static final long 		BYTES_PER_GIG 		= 1073741824;	//2^30 bytes per gig
- 
+
 	public static void main(String args[])
-    {    	   	
+    {    	
+		LogWriter.log(InternalConfigStrings.getString("LiveViewLauncher.TitleBarText"));
+		LogWriter.log("Host Operating System: " + System.getProperty("os.name"));
+
     	//JFrame.setDefaultLookAndFeelDecorated(true);	//Java style GUI
     	
     	//Get the native look and feel class name
@@ -150,17 +157,23 @@ public class LiveViewLauncher
        	/* System Time Field */
     	final JTextField systemTimeField = new JTextField();
     	systemTimeField.setColumns(20);	//set text field width
-    	if(InternalConfigStrings.getString("LiveViewLauncher.DefaultSystemTime").compareTo("<NOW>") == 0)	//if user specifies <NOW> use current date/time as default sys time
-    	{
-    		DateFormat df = new SimpleDateFormat(dateFormat);
-    		String formattedDate = null;
-
-    		formattedDate = df.format(now);
-
-    		systemTimeField.setText(formattedDate);
-    	}
-    	else
-    		systemTimeField.setText(InternalConfigStrings.getString("LiveViewLauncher.DefaultSystemTime"));
+//    	if(InternalConfigStrings.getString("LiveViewLauncher.DefaultSystemTime").compareTo("<NOW>") == 0)	//if user specifies <NOW> use current date/time as default sys time
+//    	{
+//    		DateFormat df = DateFormat.getDateTimeInstance();
+////    		DateFormat df = new SimpleDateFormat(dateFormat);
+//    		String formattedDate = null;
+//
+//    		formattedDate = df.format(now);
+//
+//    		systemTimeField.setText(formattedDate);
+//    	}
+//    	else
+//    		systemTimeField.setText(InternalConfigStrings.getString("LiveViewLauncher.DefaultSystemTime"));
+    	
+    	DateFormat df = DateFormat.getDateTimeInstance();
+		String formattedDate = null;
+   		formattedDate = df.format(now);
+   		systemTimeField.setText(formattedDate);
     	
     	systemTimeField.setToolTipText(InternalConfigStrings.getString("LiveViewLauncher.ToolTipSystemTime"));
   
@@ -357,34 +370,50 @@ public class LiveViewLauncher
     	
     	/* Physical Device Selection Group (Panel) */
     	final JPanel physicalDeviceSelectionPanel = new JPanel();
+    	physicalDeviceSelectionPanel.setLayout(new BoxLayout(physicalDeviceSelectionPanel,BoxLayout.LINE_AXIS));
+    	physicalDeviceSelectionPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 10, 10));
     	physicalDeviceSelectionPanel.add(physicalDeviceSelectionLabel);		//add label
-    	physicalDeviceSelectionPanel.add(physicalDeviceCombo,BorderLayout.SOUTH);		//add combo box
+    	physicalDeviceSelectionPanel.add(Box.createRigidArea(new Dimension(5, 0)));
+    	physicalDeviceSelectionPanel.add(physicalDeviceCombo);		//add combo box
+    	
+    	final JPanel bootSourceCardPanel = new JPanel(new CardLayout());
+    	JPanel inTextAndButton = new JPanel();
+    	inTextAndButton.add(inputFileField);
+    	inTextAndButton.add(browseInputButton);
+    	bootSourceCardPanel.add(inTextAndButton, "ImageFile");
+    	bootSourceCardPanel.add(physicalDeviceSelectionPanel, "PhysicalDisk");
+
     	
     	/* Listener for enabling/disabling the appropriate source of the image input areas */
        	ActionListener sourceModeListener = new ActionListener()
     	{
     		public void actionPerformed(ActionEvent e)
     		{   
-    			if(e.getActionCommand().compareTo("ImageFile") == 0)	//user chose source as image file
-    			{
-    				//enable imagefile input box
-    				inputFileField.setVisible(true);
-    				browseInputButton.setVisible(true);
-    				//disable device selection combo
-    				physicalDeviceCombo.setVisible(false);
-    				physicalDeviceSelectionLabel.setVisible(false);
+    			CardLayout cl = (CardLayout)(bootSourceCardPanel.getLayout());
+    			cl.show(bootSourceCardPanel, e.getActionCommand());
+    			
+//    			if(e.getActionCommand().compareTo("ImageFile") == 0)	//user chose source as image file
+//    			{
+//    				//enable imagefile input box
+//    				inputFileField.setVisible(true);
+//    				browseInputButton.setVisible(true);
+//    				//disable device selection combo
+//    				physicalDeviceCombo.setVisible(false);
+//    				physicalDeviceSelectionLabel.setVisible(false);
+//    				
+//    			}
+//    			else	//user chose device selection
+//    			{
+//    				//enable device selection combo
+//    				physicalDeviceCombo.setVisible(true);
+//    				physicalDeviceSelectionLabel.setVisible(true);
+//    				//disable imagefile input box
+//    				inputFileField.setVisible(false);
+//    				browseInputButton.setVisible(false);
     				
-    			}
-    			else	//user chose device selection
+    			if(e.getActionCommand().compareTo("PhysicalDisk") == 0)
     			{
-    				//enable device selection combo
-    				physicalDeviceCombo.setVisible(true);
-    				physicalDeviceSelectionLabel.setVisible(true);
-    				//disable imagefile input box
-    				inputFileField.setVisible(false);
-    				browseInputButton.setVisible(false);
-    				
-        	    	// fill physical device combo with info on physical devices  	
+    				// fill physical device combo with info on physical devices  	
         	    	PhysicalDiskInfo[] physicalDeviceItems = getPhysicalDeviceItems();
         	    	
         	    	String displayString;
@@ -410,12 +439,12 @@ public class LiveViewLauncher
     	imageFileRadioButton.addActionListener(sourceModeListener);
     	physicalDiskRadioButton.addActionListener(sourceModeListener);
     	
-    	//set the default source mode (choose image files, not physical device)
-		inputFileField.setVisible(true);	//enable imagefile input box
-		browseInputButton.setVisible(true);
-		physicalDeviceCombo.setVisible(false);	//disable device selection combo
-		physicalDeviceSelectionLabel.setVisible(false);
-    	
+//    	//set the default source mode (choose image files, not physical device)
+//		inputFileField.setVisible(true);	//enable imagefile input box
+//		browseInputButton.setVisible(true);
+//		physicalDeviceCombo.setVisible(false);	//disable device selection combo
+//		physicalDeviceSelectionLabel.setVisible(false);
+//    	
     	/* Start Button */
     	final  JButton 	start 		= new JButton("Start");
     	start.setToolTipText(InternalConfigStrings.getString("LiveViewLauncher.ToolTipStartButton"));
@@ -447,9 +476,10 @@ public class LiveViewLauncher
     	
     	/* Check that the user has an up to date JVM >= global var JVM_MINIMUM_REQ */
     	String javaVersion = System.getProperty("java.version", "0.0");
+    	
     	String jvmBaseVersion = javaVersion.substring(0,javaVersion.indexOf(".") + 2);	//version string including one digit after the decimal ie 1.5
     	double jvmBaseVersionNum = Double.parseDouble(jvmBaseVersion);
-
+		LogWriter.log("Java Version: " + jvmBaseVersion);
     	if (jvmBaseVersionNum < JVM_MINIMUM_REQ)	//if JVM doesnt meet minimum requirements, alert user
     	{
 	    	Object[] options = {"Okay"};	//button text
@@ -468,6 +498,7 @@ public class LiveViewLauncher
 		   	}
     	}
     	
+		LogWriter.log("VMWare Install Type: " + vmWareInstallType);
 		/* Check that Some Version of VMWare is installed */
     	if (vmWareInstallType == -1)	//if no vmware install (workstation or server) detected
     	{
@@ -486,7 +517,8 @@ public class LiveViewLauncher
 		   		System.exit(1);		//exit program
 		   	}
     	}
-    	
+
+		LogWriter.log("VMWare Mount Path: " + VMWARE_MOUNT_PATH);
 		/* Check that Some VMWare Disk Mount Is Installed */
     	if (VMWARE_MOUNT_PATH == null)	//if no vmware-mount is detected
     	{
@@ -510,22 +542,26 @@ public class LiveViewLauncher
     	ActionListener startAListener = new ActionListener()
     	{
     		public void actionPerformed(ActionEvent e)
-    		{
+    		{   			
     			startWasClicked = true;
-    		    			
+			
    				final String sizeRamText 	 	= sizeRamField.getText().trim();		//user input ram string
-   				final String systemTimeText		= systemTimeField.getText().trim();		//user input sys time string
-   			
+  				final String systemTimeText		= systemTimeField.getText().trim();		//user input sys time string
    				guestOSTypeText					= ((ComboBoxItem)osSelectionCombo.getSelectedItem()).getUnderlyingValue();
    				
    				final String 	mode				= modeGroup.getSelection().getActionCommand();	//generate | generate and launch
    				
    				final String	bootSource			= bootSourceType.getSelection().getActionCommand();	//ImageFile | PhysicalDisk
-   				final String 	diskSize			= PARENT_DISK_SIZE_GB;			//arbitrarily large constant			
+   				final String 	diskSize			= PARENT_DISK_SIZE_GB;			
    				
    				long totalSectorsOnParentDisk = 0;			//sectors on disk image
    				
    				final boolean isPhysicalDisk = bootSource.equalsIgnoreCase("PhysicalDisk") ? true : false;	//is the user booting a physical disk or a dd image
+
+   				LogWriter.log("Ram Size: " + sizeRamText);
+   				LogWriter.log("System Time: " + systemTimeText); 
+   				LogWriter.log("Guest OS: " + guestOSTypeText);
+   				LogWriter.log("Is Physical Disk: " + isPhysicalDisk);
    				
    				final String physicalDiskName;
    				final String physicalDiskModel;
@@ -555,7 +591,7 @@ public class LiveViewLauncher
    				};
    				SwingUtilities.invokeLater(updateStartButtonState);
    				
-   				DateFormat formatter = new SimpleDateFormat(dateFormat);
+   				DateFormat formatter = DateFormat.getDateTimeInstance();//new SimpleDateFormat(dateFormat);
    				Date date = null;
 			
    				try
@@ -566,7 +602,7 @@ public class LiveViewLauncher
 	   				}
 		   			catch(ParseException pe)
 	   	   			{
-		   				throw new LiveViewException("Invalid Date Format Entered: " + pe.getMessage() + endL + "Date Should Be In Format: " + dateFormat);
+		   				throw new LiveViewException("Invalid Date Format Entered: " + pe.getMessage() + endL + "Date Should Be In Format: " + formatter.toString());
 	   	   			}
 					final long userSysTimeSince1970 = date.getTime() / 1000; 	//user specified seconds since January 1, 1970, 00:00:00 GMT
 	   				final long currentSysTimeSince1970 = now.getTime() / 1000;	//current secs since Jan 1, 1970
@@ -576,7 +612,8 @@ public class LiveViewLauncher
 	   				final String[] pathForInputFiles = inputFileField.getText().trim().split("\\s*,\\s*");	//extract array of input file paths
 	   				
 	   				sortChunkFileNamesByExtension(pathForInputFiles);	//sort the file extensions so they can be concatenated in order
-	   				
+	   				LogWriter.log("Sorted Input Files " + Arrays.toString(pathForInputFiles));
+
 	   				final boolean isChunked;
 	   				if(pathForInputFiles.length == 1)
 	   					isChunked = false;	//single file
@@ -638,6 +675,7 @@ public class LiveViewLauncher
 	   				};
 	   				
 	   				//check if the config file location for the vmrun executable is valid
+	   				LogWriter.log("vmrun path: " + VMWARE_VMRUN_PATH);
 	   				File tempCheckVMRun = new File(VMWARE_VMRUN_PATH);
 	   				if(!tempCheckVMRun.exists())
 	   				{
@@ -645,7 +683,8 @@ public class LiveViewLauncher
 	   				}
 	   				
 	            	//make sure the mount drive letter is not already mounted from a previous run that did not properly clean up
-	            	String mountDriveLetter = MOUNT_DRIVE_LETTER; 
+	   				LogWriter.log("Mount Drive Letter: " + MOUNT_DRIVE_LETTER);
+	   				String mountDriveLetter = MOUNT_DRIVE_LETTER; 
 	            	File testMountDriveLetter = new File(mountDriveLetter + ":");
 	            	if(testMountDriveLetter.isDirectory())
 	            	{
@@ -729,7 +768,7 @@ public class LiveViewLauncher
 	            		imageName = physicalDiskModel;//physicalDiskName.substring(4,physicalDiskName.length());
 	            	else
 	            		imageName = imgFiles[0].getName();
-	            	
+            	
    					/* check for the MBR identifying sequence 55AA in bytes 510-511 of MBR as a check that it is valid*/
    					if(tmp512.getMarker()[0] != 0x55 || tmp512.getMarker()[1] != 0xAA) 
    					{
@@ -738,7 +777,9 @@ public class LiveViewLauncher
    													+ "Please make sure that the image file(s) you chose is a valid disk image");
    					}
    					else	//we almost certainly have an mbr or a partition (not a garbage file)
-   					{}
+   					{
+   		   				LogWriter.log("MBR Signature found: almost certainly have an mbr or partition (not garbagefile)");
+   					}
 					
    					//sanity check on user's image file selection
    					if(tmp512.isValidMBR())	//if mbr structure is a valid mbr (not first 512 bytes of a partition)
@@ -752,92 +793,6 @@ public class LiveViewLauncher
 						postOutput("Detected Partition Image" + endL);
 					}
    				
-   	   				String fsType = null;		//type of filesystem for this image (NTFS, FAT, etc)
-   					if(!isFullDisk) //partition only
-   					{
-   						//read in and modify generic mbr
-						long sizeOfPartition = 0;		//size of the partition in bytes
-						for(int i = 0; i < imgFiles.length; i++)
-						{
-							sizeOfPartition += imgFiles[i].length();
-						}
-
-   						//we cannot autodetect the os for partition images (because there is no MBR)
-						if(guestOSTypeText.equals("auto"))
-						{
-							throw new LiveViewException("Live View cannot auto detect the OS for partition images. Please select the image OS and try again.");
-						}
-						
-						if(guestOSTypeText.equals("linux"))
-						{
-							throw new LiveViewException("Live View does not currently support linux partition images. If you have access to the full disk image, please select that and try again.");
-						}
-						
-						//depending on the OS, choose the correct 'generic' mbr for the partition
-						if(guestOSTypeText.equals("win98") || guestOSTypeText.equals("winMe"))	//win 98 or Me
-							genericMBR = new File(InternalConfigStrings.getString("LiveViewLauncher.GenericMBRLocationW98Me"));
-						else							//non-win98/Me  //TODO linux???
-							genericMBR = new File(InternalConfigStrings.getString("LiveViewLauncher.GenericMBRLocation"));
-
-						//mbr file based on the image file name with .mbr appended to it
-						customMBR = new File(testDir.getAbsolutePath().trim() + 
-													System.getProperty("file.separator") + 
-													imgFiles[0].getName() + 
-													".mbr");
-						
-						//note, this does not write the nt driver serial number (bytes 440-443 of mbr)
-						//this is because we need the vmdk to mount the disk to check the registry for this
-						//serial number but the vmdk is not created at this point. The serial number is added after the vmdk is created
-						modifyGenericMBR(sizeOfPartition, 255, genericMBR, customMBR);		//creates customMBR
-						mbr = new MasterBootRecord(customMBR);	//use modified generic mbr 				
-   					}
-   					else	//full disk
-   					{
-   						if(!isPhysicalDisk)
-   							mbr = new MasterBootRecord(imgFiles[0]);	//use mbr from image
-   						else
-   							mbr = tmp512;
-   						//check mbr flag for bootable partition and check if fat or ntfs
-						if(mbr.getBootablePartition().isFAT())
-							fsType = "FAT";
-						else if(mbr.getBootablePartition().isNTFS())
-							fsType = "NTFS";
-						else
-							fsType = "OTHER";
-   					}
-			
-   					if(!guestOSTypeText.equals("auto"))	//if the user selected the OS
-   					{
-   						//sanity check on user's OS type selection
-						if(OperatingSystem.isNTKernel(guestOSTypeText) && mbr.getBootablePartition().isNotWindowsBased())	//selected NT based sys, AND mbr has non windows FS
-						{
-							throw new LiveViewException("You have selected a Windows NT Based OS, but the bootable partition's filesystem does not appear to be compatible with NT Based Systems. Please select the correct OS for your disk image and try again.");
-						}
-   					}
-   					
-   					/* Create the output files (vmx and vmdk) in the output directory (same base name as the image file)*/
-   	   				String outFileVMXName 			= imageName + ".vmx";
-   	   				String outFileVMDKName 			= imageName + ".vmdk";
-
-   	   				//build name for new file with full path to output file
-   	   				final String fullOutVMXPath 	= testDir.getAbsolutePath().trim() + System.getProperty("file.separator") + outFileVMXName;		//vmx config
-   	   				final String fullOutVMDKPath 	= testDir.getAbsolutePath().trim() + System.getProperty("file.separator") + outFileVMDKName;	//vmdk config
-   	   				
-   	   				File outVMXFile 				= new File(fullOutVMXPath);				//vmx file 
-   	   				File outVMDKFile 				= new File(fullOutVMDKPath);			//vmdk file
-  	   				
-//	   				final int numExistingSnapshots = numSnapshots(fullOutVMXPath);
-   	   				final int numExistingSnapshots;		//how many snapshots exist for this vmx already
-   	   				if(snapshotExists(fullOutVMXPath))
-   	   					numExistingSnapshots = 1;
-   	   				else
-   	   					numExistingSnapshots = 0;
- 				
-   	   				if(numExistingSnapshots == -1)	//error detecting snapshots
-   	   				{
-   	   					throw new LiveViewException("Problem Detecting Number of Snapshots. Check that the path to the vmrun executable is configured correctly");
-   	   				}
-   					
    	   				if(!isPhysicalDisk)
    	   				{
 	   					/* check if any files in the image are not readonly */
@@ -845,7 +800,10 @@ public class LiveViewLauncher
 	   					for(int i = 0; i < imgFiles.length; i++)
 	   					{
 	   						if(imgFiles[i].canWrite())
+	   						{
 	   							writable = true;
+	   			   				LogWriter.log("Writable File: " + imgFiles[i]);
+	   						}
 	   					}
 	   					
 	   					if(writable)	//if any file is not read-only, prompt to make them read only
@@ -865,8 +823,35 @@ public class LiveViewLauncher
 						   		for(int i = 0; i < imgFiles.length; i++)	//set image files to read-only
 						   			imgFiles[i].setReadOnly();
 						   		postOutput("Making image file(s) read-only at user's request" + endL);
-						   	}	   	
+						   	}	   
+						   	else
+				   				LogWriter.log("User chose not to make image files read-only");
 	  					}
+   	   				}
+   	   				   	   				
+   					/* Create the output files (vmx and vmdk) in the output directory (same base name as the image file)*/
+   	   				String outFileVMXName 			= imageName + ".vmx";
+   	   				String outFileVMDKName 			= imageName + ".vmdk";
+
+   	   				//build name for new file with full path to output file
+   	   				final String fullOutVMXPath 	= testDir.getAbsolutePath().trim() + System.getProperty("file.separator") + outFileVMXName;		//vmx config
+   	   				final String fullOutVMDKPath 	= testDir.getAbsolutePath().trim() + System.getProperty("file.separator") + outFileVMDKName;	//vmdk config
+   	   				
+   	   				File outVMXFile 				= new File(fullOutVMXPath);				//vmx file 
+   	   				File outVMDKFile 				= new File(fullOutVMDKPath);			//vmdk file
+  	   				
+//	   				final int numExistingSnapshots = numSnapshots(fullOutVMXPath);
+   	   				final int numExistingSnapshots;		//how many snapshots exist for this vmx already
+   	   				if(snapshotExists(fullOutVMXPath))
+   	   					numExistingSnapshots = 1;
+   	   				else
+   	   					numExistingSnapshots = 0;
+ 				
+	   				LogWriter.log("Num Existing Snapshots " + numExistingSnapshots);
+   	   				
+   	   				if(numExistingSnapshots == -1)	//error detecting snapshots
+   	   				{
+   	   					throw new LiveViewException("Problem Detecting Number of Snapshots. Check that the path to the vmrun executable is configured correctly");
    	   				}
    	   				
    	   				int answerContStartOver;		//user response to continue or start from scratch
@@ -905,11 +890,15 @@ public class LiveViewLauncher
 	   	   								for(int n = 0; n < imgFiles.length; n++)	//for all of the input image files
 	   	   								{
 	   	   									if(imgFiles[n].getName().compareTo(fName) == 0)	//file name matches one of the image files itself (we dont want to delete those)
+	   	   									{
+	   	   										LogWriter.log("Skipped: " + fName);
 	   	   										dontDelete = true;
+	   	   									}
 	   	   								}
    	   								}
    	   								if(!dontDelete)	//if current file in dir is not one of the image files
    	   								{
+   	   				   					LogWriter.log("Deleted: " + fName);
    	   									filesInDir[i].delete();	//delete it
    	   								}
    	   							}
@@ -924,193 +913,288 @@ public class LiveViewLauncher
    	   					startFromScratch = true;
    	   				else
    	   					startFromScratch = false;
-   	   				
-   	   				//check if the vmx output file already exists
-   	   				if(!outVMXFile.exists())
-   	   				{
-   	   					try	//no, so create it
-   						{  
-   	   						outVMXFile.createNewFile();	//create the file
-   	   					}
-   	   					catch(IOException ioe)
-   						{
-   	   						throw new LiveViewException("Could not create file: " + outFileVMXName + " in " + outDirVal + ioe.getMessage());  
-   						}
-   	   				}
-   	   				else if(!outVMXFile.canWrite()) //check if the file is writable
-   	   				{
-   	   					throw new LiveViewException(outFileVMXName + " in " + outDirVal + " is not writable."
-   	   												+ endL
-   	   												+ "Please make the file writable or choose a new one.");  
-   	   				}
-   	   				
-   	   				//vmx file exists and is writable, so write it
-   					PrintWriter vmxWriter = null;
-   					try
-   					{
-   						postOutput("Generating vmx file..." + endL);
-   						vmxWriter = new PrintWriter(new BufferedWriter( new FileWriter(outVMXFile) ));
-   						vmxWriter.write("#Static Values" + endL);
-   						vmxWriter.write("config.version = \"8\"" + endL);
-   						vmxWriter.write("virtualHW.version = \"3\"" + endL);
-   						vmxWriter.write("floppy0.present = \"FALSE\"" + endL);
-   						vmxWriter.write("displayName=\"" + imageName + "\"" + endL);
    					
-   						vmxWriter.write(endL);
-   						
-   						vmxWriter.write("#Drive Info" + endL);
-   						vmxWriter.write("ide0:0.present = \"TRUE\"" + endL);
    					
-   						if(numExistingSnapshots > 0 && answerContStartOver == JOptionPane.YES_OPTION)	//if snapshots exist already and the user wants to Continue with what they were working on, point the filename to the snapshot
-   							vmxWriter.write("ide0:0.fileName = \"" + fullOutVMDKPath.substring(0,fullOutVMDKPath.length()-5).concat("-000001.vmdk") + "\"" + endL);
-   						else							//otherwise point the filename to the regualar vmdk
-   							vmxWriter.write("ide0:0.fileName = \"" + fullOutVMDKPath + "\"" + endL);
-   						
-   						vmxWriter.write("ide0:0.deviceType = \"disk\"" + endL);
-   						vmxWriter.write("ide0:0.mode = \"persistent\"" + endL);
-   						
-   						vmxWriter.write("ide1:0.present = \"TRUE\"" + endL);
-   						vmxWriter.write("ide1:0.fileName = \"auto detect\"" + endL);
-   						vmxWriter.write("ide1:0.deviceType = \"cdrom-raw\"" + endL);
-   						
-   						vmxWriter.write(endL);
-   						
-   						vmxWriter.write("#User Specified" + endL);
-   						vmxWriter.write("memsize=\"" + sizeRamText + "\"" + endL);
-   						vmxWriter.write("rtc.starttime=\"" + userSysTimeSince1970 + "\"" + endL);
-  						
-   						if(!guestOSTypeText.equals("auto"))	//if the user chose an OS manually from dropdown (not auto detect)
-   							vmxWriter.write("guestOS=\"" + guestOSTypeText + "\"" + endL);
-   						
-   						if(!isVMWareServer)	//disable snapshots on vmware workstation to prevent accidental modification of original image -- vmware server does not have the snapshot tree so only necessary for workstation
-   							vmxWriter.write("snapshot.disabled = \"TRUE\"");
-   					}
-   					catch(IOException ioe)
+   	   				String fsType = null;		//type of filesystem for this image (NTFS, FAT, etc)
+   					if(!isFullDisk) //partition only
    					{
-   						postError("Error writing vmx file: " + outVMXFile.getAbsolutePath());
-   					}
-   					finally 
-   					{
-   						if (vmxWriter != null) 
-   							vmxWriter.close();
-   					}		
-   	 
-   	   				//check if the vmdk output file exists
-   	   				if(!outVMDKFile.exists())
-   	   				{
-   	   					try	//no, so create the file
-   						{  
-   	   						outVMDKFile.createNewFile();	//create the file
-   	   					}
-   	   					catch(IOException ioe)
-   						{
-   	   						throw new LiveViewException("Could not create file: " + outFileVMDKName + " in " + outDirVal
-   	   													+ endL
-   	   													+ ioe.getMessage());  
-   						}
-   	   				}
-   	   				else if(!outVMDKFile.canWrite()) //check if the file is writable
-   	   				{
-   	   					throw new LiveViewException(outFileVMDKName + " in " + outDirVal + " is not writable."
-   	   												+ endL
-   	   												+ "Please make the file writable or choose a new one.");  
-   	   				}
-   	   				
-   	   				//vmdk file exists and is writable, so write it
-   					PrintWriter vmdkWriter = null;
-   					try
-   					{
-   						postOutput("Generating vmdk file..." + endL);
-   						vmdkWriter = new PrintWriter(new BufferedWriter( new FileWriter(outVMDKFile)));
-   						vmdkWriter.write("# Disk Descriptor File" + endL);
-   						vmdkWriter.write("version=1" + endL);
-   						vmdkWriter.write("CID=fffffffe" + endL);
-   						vmdkWriter.write("parentCID=ffffffff" + endL);
-   						
-						if(!isPhysicalDisk)	//image file(s)
-   							vmdkWriter.write("createType=\"monolithicFlat\"" + endL);
-						else	//physical disk
-							vmdkWriter.write("createType=\"fullDevice\"" + endL);
+   						//read in and modify generic mbr
+						long sizeOfPartition = 0;		//size of the partition in bytes
+						for(int i = 0; i < imgFiles.length; i++)
+						{
+							sizeOfPartition += imgFiles[i].length();
+						}
+			   			LogWriter.log("Size of partition (bytes): " + sizeOfPartition);
 						
-   						vmdkWriter.write(endL);
-   						
-   						vmdkWriter.write("# Extent description" + endL);
-   						
-   						long unallocatedSpace;
-   						if(!isFullDisk)	//just a partition image
-   						{
-   							if(customMBR != null)
-   							{
-   								vmdkWriter.write("RW 63 FLAT \"" + customMBR + "\" 0" + endL);	//add reference to mbr so we can boot partition
-   							}
-   							else
-   								throw new LiveViewException("Custom MBR not found");
-   							
-   							if(isChunked)	//chunked partition image
-   							{
-   								long sectorsInChunk;
-   								for(int i = 0; i < imgFiles.length; i++)
-   								{
-   									sectorsInChunk = imgFiles[i].length() / 512;	//number of sectors in current chunk
-   									vmdkWriter.write("RW " + (sectorsInChunk) + " FLAT " + "\"" + imgFiles[i].getCanonicalPath() + "\"" + " 0" + endL);	//one line for each chunk for extent description
-   								}
-   								
-   								unallocatedSpace = totalSectorsOnParentDisk - mbr.totalSectorsFromPartitions() - 63;	
-   							}
-   							else	//not a chunked partition image
-   							{
-   								vmdkWriter.write("RW " + (mbr.totalSectorsFromPartitions()) + " FLAT " + "\"" + imgFiles[0] + "\"" + " 0" + endL);	//just need one extent line pointing to whole image file
-   								unallocatedSpace = totalSectorsOnParentDisk - mbr.totalSectorsFromPartitions() - 63;	
-   							}
-   						}
-   						else			//full disk image
-   						{
-   							if(isChunked)	//chunked full disk image
-   							{
-   								long sectorsInChunk = 0, totalSectors = 0;
-   								for(int i = 0; i < imgFiles.length; i++)
-   								{
-   									sectorsInChunk = imgFiles[i].length() / 512;
-   									totalSectors += sectorsInChunk;
-   									vmdkWriter.write("RW " + (sectorsInChunk) + " FLAT " + "\"" + imgFiles[i].getCanonicalPath() + "\"" + " 0" + endL);	//one line describing each chunk for the extent description
-   								}
-   								unallocatedSpace = totalSectors - mbr.totalSectorsFromPartitions() - 63;
-   							}
-   							else	//not a chunked full disk image
-   							{
-   								if(isPhysicalDisk)
-   								{
-   									vmdkWriter.write("RW " + (mbr.totalSectorsFromPartitions() + 63) + " FLAT " + "\"" + physicalDiskName + "\"" + " 0" + endL);	//just need one extent line pointing to the physical disk
-   								}
-   								else	//full disk dd image
-   								{
-   	   	   	   						vmdkWriter.write("RW " + mbr.totalSectorsFromPartitions() + " FLAT " + "\"" + imgFiles[0] + "\"" + " 0" + endL);	//just need one extent line pointing to whole image file
-   								}
-   								unallocatedSpace = mbr.totalSectorsOnDiskFromFile() - mbr.totalSectorsFromPartitions() - mbr.getBootablePartition().getEndSector() + 63;	//add 63?
-   							}
-   						}
-					
-   						if(unallocatedSpace > 0)
-   							vmdkWriter.write("RW " + unallocatedSpace + " ZERO" + endL);	//leftover 0'ed space
+   						//we cannot autodetect the os for partition images (because there is no MBR)
+						if(guestOSTypeText.equals("auto"))
+						{
+							throw new LiveViewException("Live View cannot auto detect the OS for partition images. Please select the image OS and try again.");
+						}
+						
+						if(guestOSTypeText.equals("linux"))
+						{
+							throw new LiveViewException("Live View does not currently support linux partition images. If you have access to the full disk image, please select that and try again.");
+						}
+						
+						//depending on the OS, choose the correct 'generic' mbr for the partition
+						if(guestOSTypeText.equals("win98") || guestOSTypeText.equals("winMe"))	//win 98 or Me
+						{
+							genericMBR = new File(InternalConfigStrings.getString("LiveViewLauncher.GenericMBRLocationW98Me"));
+				   			LogWriter.log("Using Generic Windows MBR for 98/Me");	
+						}
+						else							//non-win98/Me  //TODO linux???
+						{
+							genericMBR = new File(InternalConfigStrings.getString("LiveViewLauncher.GenericMBRLocation"));
+							LogWriter.log("Using Generic Windows MBR for non-win98/me");
+						}
 
-   						vmdkWriter.write(endL);
-   						
-   						vmdkWriter.write("#DDB - Disk Data Base" + endL);
-   						vmdkWriter.write("ddb.adapterType = \"ide\"" + endL);
-   						vmdkWriter.write("ddb.geometry.sectors = \"" + mbr.getBootablePartition().getEndSector() + "\"" + endL);
-   						vmdkWriter.write("ddb.geometry.heads = \"" + mbr.getBootablePartition().getEndHead() + "\"" + endL);
-   						vmdkWriter.write("ddb.geometry.cylinders = \"" + mbr.largestCylinderValOnDisk() + "\"" + endL);
-   						vmdkWriter.write("ddb.virtualHWVersion = \"3\"" + endL);
+						//mbr file based on the image file name with .mbr appended to it
+						customMBR = new File(testDir.getAbsolutePath().trim() + 
+													System.getProperty("file.separator") + 
+													imgFiles[0].getName() + 
+													".mbr");
+						
+						//note, this does not write the nt driver serial number (bytes 440-443 of mbr)
+						//this is because we need the vmdk to mount the disk to check the registry for this
+						//serial number but the vmdk is not created at this point. The serial number is added after the vmdk is created
+						
+						if(startFromScratch)//only modify mbr if user wants to start from scratch (otherwise it was previously created)
+							modifyGenericMBR(sizeOfPartition, 255, genericMBR, customMBR);		//creates customMBR
+						mbr = new MasterBootRecord(customMBR);	//use modified generic mbr 				
    					}
-   					catch(IOException ioe)
+   					else	//full disk
    					{
-   						throw new LiveViewException("Error writing vmdk file: " + outVMDKFile.getAbsolutePath());
+   						if(!isPhysicalDisk)
+   							mbr = new MasterBootRecord(imgFiles[0]);	//use mbr from image
+   						else
+   							mbr = tmp512;
+   						//check mbr flag for bootable partition and check if fat or ntfs
+						if(mbr.getBootablePartition().isFAT())
+							fsType = "FAT";
+						else if(mbr.getBootablePartition().isNTFS())
+							fsType = "NTFS";
+						else
+							fsType = "OTHER";
    					}
-   					finally 
+			
+	   				LogWriter.log("MBR Info:");
+	   				LogWriter.log(mbr.toString());	//log MBR contents to file
+
+   					if(!guestOSTypeText.equals("auto"))	//if the user selected the OS
    					{
-   						if (vmdkWriter != null) 
-   							vmdkWriter.close();
-   					}		
+   						//sanity check on user's OS type selection
+						if(OperatingSystem.isNTKernel(guestOSTypeText) && mbr.getBootablePartition().isNotWindowsBased())	//selected NT based sys, AND mbr has non windows FS
+						{
+							throw new LiveViewException("You have selected a Windows NT Based OS, but the bootable partition's filesystem does not appear to be compatible with NT Based Systems. Please select the correct OS for your disk image and try again.");
+						}
+   					}
+   					
+   					if(startFromScratch)	//only generate the vmx and vmdk if the user wants to start from scratch (otherwise it is already there)
+   					{
+	   	   				//check if the vmx output file already exists
+	   	   				if(!outVMXFile.exists())
+	   	   				{
+	   	   					try	//no, so create it
+	   						{  
+	   	   						outVMXFile.createNewFile();	//create the file
+				   				LogWriter.log("Created: " + outVMXFile.getAbsolutePath());
+
+	   	   					}
+	   	   					catch(IOException ioe)
+	   						{
+	   	   						throw new LiveViewException("Could not create file: " + outFileVMXName + " in " + outDirVal + ioe.getMessage());  
+	   						}
+	   	   				}
+	   	   				else if(!outVMXFile.canWrite()) //check if the file is writable
+	   	   				{
+	   	   					throw new LiveViewException(outFileVMXName + " in " + outDirVal + " is not writable."
+	   	   												+ endL
+	   	   												+ "Please make the file writable or choose a new one.");  
+	   	   				}
+	   	   				
+	   	   				//vmx file exists and is writable, so write it
+	   					PrintWriter vmxWriter = null;
+	   					try
+	   					{
+	   						StringBuffer vmxBuffer = new StringBuffer();
+	   						postOutput("Generating vmx file..." + endL);
+	   						vmxWriter = new PrintWriter(new BufferedWriter( new FileWriter(outVMXFile) ));
+	   						vmxBuffer.append("#Static Values" + endL);
+	   						vmxBuffer.append("config.version = \"8\"" + endL);
+	   						vmxBuffer.append("virtualHW.version = \"3\"" + endL);
+	   						vmxBuffer.append("floppy0.present = \"FALSE\"" + endL);
+	   						vmxBuffer.append("displayName=\"" + imageName + "\"" + endL);
+	   					
+	   						vmxBuffer.append(endL);
+	   						
+	   						vmxBuffer.append("#Drive Info" + endL);
+	   						vmxBuffer.append("ide0:0.present = \"TRUE\"" + endL);
+	   					
+	   						if(numExistingSnapshots > 0 && answerContStartOver == JOptionPane.YES_OPTION)	//if snapshots exist already and the user wants to Continue with what they were working on, point the filename to the snapshot
+	   							vmxBuffer.append("ide0:0.fileName = \"" + fullOutVMDKPath.substring(0,fullOutVMDKPath.length()-5).concat("-000001.vmdk") + "\"" + endL);
+	   						else							//otherwise point the filename to the regualar vmdk
+	   							vmxBuffer.append("ide0:0.fileName = \"" + fullOutVMDKPath + "\"" + endL);
+	   						
+	   						vmxBuffer.append("ide0:0.deviceType = \"disk\"" + endL);
+	   						vmxBuffer.append("ide0:0.mode = \"persistent\"" + endL);
+	   						
+	   						vmxBuffer.append("ide1:0.present = \"TRUE\"" + endL);
+	   						vmxBuffer.append("ide1:0.fileName = \"auto detect\"" + endL);
+	   						vmxBuffer.append("ide1:0.deviceType = \"cdrom-raw\"" + endL);
+	   						
+	   						vmxBuffer.append(endL);
+	   						
+	   						vmxBuffer.append("#User Specified" + endL);
+	   						vmxBuffer.append("memsize=\"" + sizeRamText + "\"" + endL);
+	   						vmxBuffer.append("rtc.starttime=\"" + userSysTimeSince1970 + "\"" + endL);
+	  						
+	   						if(!guestOSTypeText.equals("auto"))	//if the user chose an OS manually from dropdown (not auto detect)
+	   							vmxBuffer.append("guestOS=\"" + guestOSTypeText + "\"" + endL);
+	   						
+	   						if(!isVMWareServer)	//disable snapshots on vmware workstation to prevent accidental modification of original image -- vmware server does not have the snapshot tree so only necessary for workstation
+	   							vmxBuffer.append("snapshot.disabled = \"TRUE\"");
+	   						
+	   						LogWriter.log(vmxBuffer.toString() + endL + endL );	//log the contents of the vmx
+	   						vmxWriter.write(vmxBuffer.toString());	//write the buffer to the vmx file
+	   						
+	   					}
+	   					catch(IOException ioe)
+	   					{
+	   						postError("Error writing vmx file: " + outVMXFile.getAbsolutePath());
+	   					}
+	   					finally 
+	   					{
+	   						if (vmxWriter != null) 
+	   							vmxWriter.close();
+	   					}		
+	   	 
+	   	   				//check if the vmdk output file exists
+	   	   				if(!outVMDKFile.exists())
+	   	   				{
+	   	   					try	//no, so create the file
+	   						{  
+	   	   						outVMDKFile.createNewFile();	//create the file
+	   	   						LogWriter.log("Created: " + outVMDKFile.getAbsolutePath());
+	   	   					}
+	   	   					catch(IOException ioe)
+	   						{
+	   	   						throw new LiveViewException("Could not create file: " + outFileVMDKName + " in " + outDirVal
+	   	   													+ endL
+	   	   													+ ioe.getMessage());  
+	   						}
+	   	   				}
+	   	   				else if(!outVMDKFile.canWrite()) //check if the file is writable
+	   	   				{
+	   	   					throw new LiveViewException(outFileVMDKName + " in " + outDirVal + " is not writable."
+	   	   												+ endL
+	   	   												+ "Please make the file writable or choose a new one.");  
+	   	   				}
+	   	   				
+	   	   				//vmdk file exists and is writable, so write it
+	   					PrintWriter vmdkWriter = null;
+	   					try
+	   					{
+	   						StringBuffer vmdkBuffer = new StringBuffer();
+	   						postOutput("Generating vmdk file..." + endL);
+	   						vmdkWriter = new PrintWriter(new BufferedWriter( new FileWriter(outVMDKFile)));
+	   						vmdkBuffer.append("# Disk Descriptor File" + endL);
+	   						vmdkBuffer.append("version=1" + endL);
+	   						vmdkBuffer.append("CID=fffffffe" + endL);
+	   						vmdkBuffer.append("parentCID=ffffffff" + endL);
+	   						
+							if(!isPhysicalDisk)	//image file(s)
+								vmdkBuffer.append("createType=\"monolithicFlat\"" + endL);
+							else	//physical disk
+								vmdkBuffer.append("createType=\"fullDevice\"" + endL);
+							
+							vmdkBuffer.append(endL);
+	   						
+							vmdkBuffer.append("# Extent description" + endL);
+	   						
+	   						long unallocatedSpace;
+	   						if(!isFullDisk)	//just a partition image
+	   						{
+	   							if(customMBR != null)
+	   							{
+	   								vmdkBuffer.append("RW 63 FLAT \"" + customMBR + "\" 0" + endL);	//add reference to mbr so we can boot partition
+	   							}
+	   							else
+	   								throw new LiveViewException("Custom MBR not found");
+	   							
+	   							if(isChunked)	//chunked partition image
+	   							{
+	   								long sectorsInChunk;
+	   								for(int i = 0; i < imgFiles.length; i++)
+	   								{
+	   									sectorsInChunk = imgFiles[i].length() / 512;	//number of sectors in current chunk
+	   									vmdkBuffer.append("RW " + (sectorsInChunk) + " FLAT " + "\"" + imgFiles[i].getCanonicalPath() + "\"" + " 0" + endL);	//one line for each chunk for extent description
+	   								}
+	   								
+	   								unallocatedSpace = totalSectorsOnParentDisk - mbr.totalSectorsFromPartitions() - 63;	
+	   							}
+	   							else	//not a chunked partition image
+	   							{
+	   								vmdkBuffer.append("RW " + (mbr.totalSectorsFromPartitions()) + " FLAT " + "\"" + imgFiles[0] + "\"" + " 0" + endL);	//just need one extent line pointing to whole image file
+	   								unallocatedSpace = totalSectorsOnParentDisk - mbr.totalSectorsFromPartitions() - 63;	
+	   							}
+	   						}
+	   						else			//full disk image
+	   						{
+	   							if(isChunked)	//chunked full disk image
+	   							{
+	   								long sectorsInChunk = 0, totalSectors = 0;
+	   								for(int i = 0; i < imgFiles.length; i++)
+	   								{
+	   									sectorsInChunk = imgFiles[i].length() / 512;
+	   									totalSectors += sectorsInChunk;
+	   									vmdkBuffer.append("RW " + (sectorsInChunk) + " FLAT " + "\"" + imgFiles[i].getCanonicalPath() + "\"" + " 0" + endL);	//one line describing each chunk for the extent description
+	   								}
+	   								if(totalSectors >= mbr.totalSectorsFromPartitions())
+	   									unallocatedSpace = totalSectors - mbr.totalSectorsFromPartitions() - 63;	//standard way to get unallocated space (sectors in file - sectors in mbr)
+	   								else
+	   									unallocatedSpace = mbr.totalSectorsFromPartitions() - totalSectors + 63; //added because sometimes total sectors making up file is less than total in mbr for partitions (ie nist image) so here we account for unallocated
+	   							}
+	   							else	//not a chunked full disk image
+	   							{
+	   								if(isPhysicalDisk)
+	   								{
+	   									vmdkBuffer.append("RW " + (mbr.totalSectorsFromPartitions() + 63) + " FLAT " + "\"" + physicalDiskName + "\"" + " 0" + endL);	//just need one extent line pointing to the physical disk
+	   									unallocatedSpace = mbr.totalSectorsFromPartitions()/1000;	//fudge factor - since total sectors from file shows up as 0 for physical disks
+	   								}
+	   								else	//full disk dd image
+	   								{
+	   									vmdkBuffer.append("RW " + mbr.totalSectorsFromPartitions() + " FLAT " + "\"" + imgFiles[0] + "\"" + " 0" + endL);	//just need one extent line pointing to whole image file
+	   	   	   	   						unallocatedSpace = mbr.totalSectorsOnDiskFromFile() - mbr.totalSectorsFromPartitions() - mbr.getBootablePartition().getEndSector() + 63;	//add 63?
+	   								}
+	   							}
+	   						}
+						
+	   						if(unallocatedSpace > 0)
+	   							vmdkBuffer.append("RW " + unallocatedSpace + " ZERO" + endL);	//leftover 0'ed space
+	   										
+	   						vmdkBuffer.append(endL);
+	   						
+	   						vmdkBuffer.append("#DDB - Disk Data Base" + endL);
+	   						vmdkBuffer.append("ddb.adapterType = \"ide\"" + endL);
+	   						vmdkBuffer.append("ddb.geometry.sectors = \"" + mbr.getBootablePartition().getEndSector() + "\"" + endL);
+	   						vmdkBuffer.append("ddb.geometry.heads = \"" + mbr.getBootablePartition().getEndHead() + "\"" + endL);
+	   						vmdkBuffer.append("ddb.geometry.cylinders = \"" + mbr.largestCylinderValOnDisk() + "\"" + endL);
+	   						vmdkBuffer.append("ddb.virtualHWVersion = \"3\"" + endL);
+	   						
+	   						LogWriter.log(vmdkBuffer.toString());
+	   						vmdkWriter.write(vmdkBuffer.toString());	//write the vmdk buffer to the file
+	   					}
+	   					catch(IOException ioe)
+	   					{
+	   						throw new LiveViewException("Error writing vmdk file: " + outVMDKFile.getAbsolutePath());
+	   					}
+	   					finally 
+	   					{
+	   						if (vmdkWriter != null) 
+	   							vmdkWriter.close();
+	   					}	
+   					}
    					
    	   				final File custMBR = customMBR;	//for access inside swingworker -- should probably change this
    	   				final String fileSysType = fsType;	//for access inside swingworker
@@ -1145,6 +1229,57 @@ public class LiveViewLauncher
                 					postError("Problem preparing partition" + bootablePartitionIndex + " for launch");
                 					prepWorked = false;
                 				}
+              				
+    		                	//get find first nt partition on the disk (if there is one)
+    	   	   					int ntPartitionIndex = bootablePartitionIndex;
+    		                	
+    		   	   				//write the nt drive serial number to the customized mbr from above
+    		   	   				if(!isFullDisk && OperatingSystem.isNTKernel(guestOSTypeText)) //dealing with just an NTKernel partition 
+    		   	   				{
+    		   	   					int[] ntDriveSerialNum = {0x00, 0x00, 0x00, 0x00}; //generic 4 byte serial for non nt systems (those done require serial numbers)
+    		   	   					
+    		   	   					if(ntPartitionIndex > 0)	//if os is nt based (but not Original NT)
+    		   	   					{
+    		   	   						String vmdkSnapshotLoc = fullOutVMDKPath.substring(0,fullOutVMDKPath.length()-5).concat("-000001.vmdk");	//xyz.vmdk -> xyz-000001.vmdk  (snapshot naming convention)
+    		   	   						LogWriter.log("Snapshot Location: " + vmdkSnapshotLoc);
+    		   	   						
+    		   	   						if(startFromScratch)	//if user wants to start from scratch
+    		   	   							ntDriveSerialNum = getNTDriveSerialNum(vmdkSnapshotLoc, false, os, ntPartitionIndex);	//get the NT drive serial number
+    		   	   						else
+    		   	   							ntDriveSerialNum = getNTDriveSerialNum(vmdkSnapshotLoc, true, os, ntPartitionIndex);	//get the NT drive serial number
+    		   	   						
+    		   	   						LogWriter.log("Drive Serial Number: " + Arrays.toString(ntDriveSerialNum));
+    		   	   					
+    		   	   					}
+    		   	   					
+    		   	   					if(ntDriveSerialNum != null)	//if we got the 4 byte serial number, write it to the mbr
+    		   	   					{
+    		   	   						try 
+    				   	   			    {
+    					   	   		        RandomAccessFile raf = new RandomAccessFile(custMBR, "rw");
+    				 						LogWriter.log("MBR File: " + custMBR.getName() + " opened r/w");
+    				 		    		   	  
+    					   	   		        //serial number starts at byte 440, so skip to there and write the 4 byte serial
+    						   	 	        raf.seek(440);	
+    						   		        raf.write(ntDriveSerialNum[0]); 	
+    						   		        raf.seek(441);
+    						   		        raf.write(ntDriveSerialNum[1]); 
+    						   		        raf.seek(442);
+    						   		        raf.write(ntDriveSerialNum[2]); 
+    						   		        raf.seek(443);
+    						   		        raf.write(ntDriveSerialNum[3]);
+    						   		        
+    					   	   		        raf.close();
+    					   	   		        postOutput("Custom MBR For Partition Generated Successfully" + endL);
+    				   	   			    } 
+    				   	   			    catch (IOException ioe) 
+    				   	   			    {
+    				   	   			    	postError("I/O error while writing nt drive serial number to custom mbr: " + ioe.getMessage());
+    				   	   			    }
+    		   	   					}
+    		   	   					else	//error retrieving drive serial
+    		   	   						prepWorked = false;
+    			   	   	   		}
 		                	}	
 		                	else if(numExistingSnapshots == 1)	//user wants to continue with existing snapshot
 		                	{
@@ -1155,52 +1290,6 @@ public class LiveViewLauncher
 		                		postError("Existing Snapshot Detection Failure: " + numExistingSnapshots);
 		                		prepWorked = false;
 		                	}
-
-		                	//get find first nt partition on the disk (if there is one)
-	   	   					int ntPartitionIndex = bootablePartitionIndex;
-		                	
-		   	   				//write the nt drive serial number to the customized mbr from above
-		   	   				if(!isFullDisk && OperatingSystem.isNTKernel(guestOSTypeText)) //dealing with just an NTKernel partition 
-		   	   				{
-		   	   					int[] ntDriveSerialNum = {0x00, 0x00, 0x00, 0x00}; //generic 4 byte serial for non nt systems (those done require serial numbers)
-		   	   					
-		   	   					if(ntPartitionIndex > 0)	//if os is nt based (but not Original NT)
-		   	   					{
-		   	   						String vmdkSnapshotLoc = fullOutVMDKPath.substring(0,fullOutVMDKPath.length()-5).concat("-000001.vmdk");	//xyz.vmdk -> xyz-000001.vmdk  (snapshot naming convention)
-		   	   						
-		   	   						if(startFromScratch)	//if user wants to start from scratch
-		   	   							ntDriveSerialNum = getNTDriveSerialNum(vmdkSnapshotLoc, false, os, ntPartitionIndex);	//get the NT drive serial number
-		   	   						else
-		   	   							ntDriveSerialNum = getNTDriveSerialNum(vmdkSnapshotLoc, true, os, ntPartitionIndex);	//get the NT drive serial number
-		   	   					}
-		   	   					
-		   	   					if(ntDriveSerialNum != null)	//if we got the 4 byte serial number, write it to the mbr
-		   	   					{
-		   	   						try 
-				   	   			    {
-					   	   		        RandomAccessFile raf = new RandomAccessFile(custMBR, "rw");
-			
-					   	   		        //serial number starts at byte 440, so skip to there and write the 4 byte serial
-						   	 	        raf.seek(440);	
-						   		        raf.write(ntDriveSerialNum[0]); 	
-						   		        raf.seek(441);
-						   		        raf.write(ntDriveSerialNum[1]); 
-						   		        raf.seek(442);
-						   		        raf.write(ntDriveSerialNum[2]); 
-						   		        raf.seek(443);
-						   		        raf.write(ntDriveSerialNum[3]);
-						   		        
-					   	   		        raf.close();
-					   	   		        postOutput("Custom MBR For Partition Generated Successfully" + endL);
-				   	   			    } 
-				   	   			    catch (IOException ioe) 
-				   	   			    {
-				   	   			    	postError("I/O error while writing nt drive serial number to custom mbr: " + ioe.getMessage());
-				   	   			    }
-		   	   					}
-		   	   					else	//error retrieving drive serial
-		   	   						prepWorked = false;
-			   	   	   		}
 		   	   				
 		   	   				if(mode.equals("GenerateAndLaunch")) //did the user choose to launch the vm as well
 			   	   			{
@@ -1296,9 +1385,12 @@ public class LiveViewLauncher
         {
             public void windowClosing(WindowEvent e) 
             {
-            		stopProc();
-            		cleanUp();
-            		System.exit(0);
+				LogWriter.log("User Closed Program Window");
+            	stopProc();
+            	LogWriter.log("Stopped running processes");
+            	cleanUp();
+            	LogWriter.log("Cleaned Up");
+            	System.exit(0);
             }
         });
   	
@@ -1311,12 +1403,11 @@ public class LiveViewLauncher
     	/* Browse For Input Location Group */
     	JPanel browseInPanel = new JPanel();	//1 col, unlimited rows
     	browseInPanel.setLayout(new BoxLayout(browseInPanel,BoxLayout.PAGE_AXIS));
-    	JPanel inTextAndButton = new JPanel();
-    	inTextAndButton.add(inputFileField);
-    	inTextAndButton.add(browseInputButton);
     	browseInPanel.add(bootSourcePanel);
-    	browseInPanel.add(inTextAndButton);
-    	browseInPanel.add(physicalDeviceSelectionPanel);
+//    	browseInPanel.add(inTextAndButton);
+//    	browseInPanel.add(physicalDeviceSelectionPanel);
+    	browseInPanel.add(bootSourceCardPanel);
+   	
     	browseInPanel.setBorder(BorderFactory.createTitledBorder(BorderFactory.createBevelBorder(2),InternalConfigStrings.getString("LiveViewLauncher.ForensicImageBorderText"))); 
     	
     	/* Action Button Group */
@@ -1538,6 +1629,7 @@ public class LiveViewLauncher
 			{
 				vmxOutStream = new DataOutputStream(new FileOutputStream(vmxLoc,true));
 				vmxOutStream.writeBytes("guestOS=\"" + guestOSVal + "\"" + endL);		//append guestOS="<osname>" to vmx file
+				LogWriter.log("Added: " + "guestOS=\"" + guestOSVal + "\"" + " to " + vmxLoc);
 				vmxOutStream.flush();
 				vmxOutStream.close();
 				postOutput("Added guest OS to vmx file" + endL);
@@ -1740,6 +1832,7 @@ public class LiveViewLauncher
      */
     public static String callExternalProcess(String[] cmd)
     {
+    	LogWriter.log("Executing: " + Arrays.toString(cmd));
     	try
     	{
     		externalProc = Runtime.getRuntime().exec(cmd);
@@ -1760,6 +1853,8 @@ public class LiveViewLauncher
 			
 			//check for exit val - ie any errors
 			int exitVal = externalProc.waitFor();
+			
+			LogWriter.log("External Proc Output: " + stdOutReader.getReturnText());
 			
 			String errorMsg = stdErrReader.getReturnText();
 			if(errorMsg.trim().length() > 0)
@@ -1893,6 +1988,8 @@ public class LiveViewLauncher
     	else 
     		return false; 	//unhandled os selected
 
+    	LogWriter.log("Driver Destination Location: " + driverDestinationLoc);
+
     	//test if the intelide.sys driver is already present
 		File f = new File(driverDestinationLoc + "\\" + driverNameToExtract);
 		if(f.exists())
@@ -1900,6 +1997,8 @@ public class LiveViewLauncher
 			postOutput("Intel IDE Driver Already Exists On The System, Skipping Extraction" + endL);
 			return true;
 		}
+		else
+			LogWriter.log("intel ide driver not found in driver directory on image");
     	
     	String driverCabLoc = null;
     	String cabPrefix = systemRootDir + "\\Driver Cache\\i386";
@@ -1911,14 +2010,21 @@ public class LiveViewLauncher
     		driverCabLoc = cabPrefix + "\\sp" + i + ".cab";
     		cabFile = new File(driverCabLoc);
     		if(cabFile.exists())
+    		{
     			foundCab = true;
+    			LogWriter.log("Found: " + cabFile.getName());
+    		}
     	}
     	if(!foundCab)		//no spX.cab files found, check driver.cab
     	{
     		driverCabLoc = cabPrefix + "\\driver.cab";
+    		LogWriter.log("No spX.cab found, looking for: " + driverCabLoc);
     		cabFile = new File(driverCabLoc);
     		if(cabFile.exists())
+    		{
+    			LogWriter.log("Found: " + driverCabLoc);
     			foundCab = true;
+    		}
     	}
     	
     	if(!foundCab)	//no spX.cab or driver.cab files found (error)
@@ -1958,6 +2064,8 @@ public class LiveViewLauncher
     	else 
     		return false; 	//unhandled os selected
 
+    	LogWriter.log("Driver Destination Location: " + driverDestinationLoc);
+    	
     	try 	//copy intelde.sys driver to drivers directory so it can be booted in vmware's intel based vm
         {
     		String driverName = "\\intelide.sys";
@@ -2019,8 +2127,14 @@ public class LiveViewLauncher
     private static boolean addToVMServerConfigFile(String vmxPath)
     {
         BufferedWriter bw = null;
-        String pathToVMList = System.getenv("ALLUSERSPROFILE") + InternalConfigStrings.getString("LiveViewLauncher.VMWareServerVMListLocation");
+        
+        String commonAppDataPath = queryRegistry("HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders", "Common AppData", "REG_SZ");
+        String pathToVMList = commonAppDataPath + InternalConfigStrings.getString("LiveViewLauncher.VMWareServerVMListLocation");//System.getenv("APPDATA") + InternalConfigStrings.getString("LiveViewLauncher.VMWareServerVMListLocation");
+        
         String stringToAdd = "config " +  "\"" + vmxPath + "\"";
+        
+    	LogWriter.log("Path TO VMServer vm-list: " + pathToVMList);
+    	LogWriter.log("String to add: " + stringToAdd);
         
         //check if the entry is already there
         try 
@@ -2032,7 +2146,10 @@ public class LiveViewLauncher
         	while ((line = bufReader.readLine()) != null) 
         	{  
         		if(line.equals(stringToAdd))
+        		{
+        			LogWriter.log("vmx was already in vm-list, skipping append");
         			return true;				//vmx is already in the config file
+        		}
         	}
         }
         catch (Exception e) 
@@ -2056,7 +2173,7 @@ public class LiveViewLauncher
 			return false;
 		}
 		finally
-		{ // always close the file
+		{ //close the file
 			if (bw != null)
 			{
 				try
@@ -2313,6 +2430,8 @@ public class LiveViewLauncher
 	    		serialNum = null;
 	    	}
 
+	    	LogWriter.log("System Hive Loc: " + systemHiveLoc);
+	    	
 	    	if(serialNum != null && systemHiveLoc != null)	//we know it is either an XP or 2K aliased OS
 	    		worked = loadSystemHive(systemHiveLoc);
 	 
@@ -2345,7 +2464,8 @@ public class LiveViewLauncher
             if(regData != null)
             {
             	diskSerialString = regData.substring(0,8); 	//chop off first 8 characters (4 hex bytes)
-    			
+    	    	LogWriter.log("Disk Serial Number: " + diskSerialString);
+
             	//convert hex string to integer array
     			long val = Long.parseLong( diskSerialString, 16 );
     			serialNum[0] = (int) ( ( val >>> 24 ) & 0xff );
@@ -2476,13 +2596,17 @@ public class LiveViewLauncher
 				catch(NumberFormatException nfe)
 				{
 					if(isNumber == true)
+					{
 						inconsistent = true;
+						LogWriter.log("Found Inconsistent Image File Extension: " + extensions[i]);
+					}
 				}			
 			}
 		}
 
 		if(isNumber && !inconsistent)	//if we have all numeric extensions
 		{
+			LogWriter.log("All numeric extensions");
 			//basic bubble sort of file extensions and file names at the same time
 			for(int i = 0; i < extensions.length - 1; i++)
 			{
@@ -2503,10 +2627,12 @@ public class LiveViewLauncher
 					}
 				}
 			}
+			LogWriter.log("Sorted extensions numerically");
 //			System.out.println("Sorted Numerically: " + Arrays.toString(chunkFiles));
 		}
 		else	//not numeric extensions (or mixed extensions)
 		{
+			LogWriter.log("non-numeric or mixed extensions detected");
 			Arrays.sort(chunkFiles);	//sort alphabetically
 //			System.out.println("sorted alphabetically: " + Arrays.toString(chunkFiles));
 		}
@@ -2546,13 +2672,6 @@ public class LiveViewLauncher
 	private static String queryRegistryForVMWareCore()
 	{
     	//search registry key HKLM\SOFTWARE\VMWare, Inc.\Core
-    	String[] cmd = new String[5];
-    	cmd[0] = "reg";
-    	cmd[1] = "query";	
-    	cmd[2] = "\"" + "HKLM\\SOFTWARE\\VMWare, Inc." + "\"";
-    	cmd[3] = "/v";
-    	cmd[4] = "Core";
-
         String regData = queryRegistry("HKLM\\SOFTWARE\\VMWare, Inc.",
         								"Core",
         								"REG_SZ");
@@ -2578,18 +2697,19 @@ public class LiveViewLauncher
 		ArrayList diskInfoList = new ArrayList();
 		PhysicalDiskInfo[] returnVal = null;
 		
-		//wmic /namespace:\\root\cimv2 path Win32_DiskDrive get index, InterfaceType, model, size
-    	String[] cmd = new String[9];
+		Map validDeviceIndexMapping = getUsbAndFirewireDeviceIndexMapping();
+		Map indexModelMapping = getIndexModelNameDeviceMapping(validDeviceIndexMapping);
+		
+		//get the index and size of each physical device attached to machine
+		//wmic /namespace:\\root\cimv2 path Win32_DiskDrive get index, size
+    	String[] cmd = new String[7];
     	cmd[0] = "wmic";
     	cmd[1] = "/namespace" + ":\\\\root\\cimv2";	
     	cmd[2] = "path";
     	cmd[3] = "Win32_DiskDrive";
     	cmd[4] = "get";
     	cmd[5] = "index";
-    	cmd[6] = ",InterfaceType";
-		cmd[7] = ",model";
-		cmd[8] = ",size";
-    	
+    	cmd[6] = ",size";   	
 		
 		String outputBuffer = callExternalProcess(cmd);
 		
@@ -2598,41 +2718,152 @@ public class LiveViewLauncher
 		
 		String[] outputLines = outputBuffer.split(System.getProperty("line.separator"));
     		
+		String deviceIndex;
+		double diskSize;
+		
 		String line;
-        
-        String index, interfaceType, model;
-        double size;
-
         for(int i = 0; i < outputLines.length; i++)	//for every output line
         {
-        	line = outputLines[i];
-        	if(!line.trim().startsWith("Index") && !line.equals(endL))	//if line is not a column header line
+        	line = outputLines[i].trim();
+        	if(!line.startsWith("Index") && !line.equals(""))	//if line is not a column header line
         	{	
-        		String[] colVals = line.trim().split("\\s\\s+", 4);	//4 chunks separaed by 2 or more spaces
+        		deviceIndex = line.substring(0,1);	//extract index of this device
+        		LogWriter.log("Device Index: " + deviceIndex);
         		
-        		if(colVals.length != 4)
-        			return null;
+        		String sizeString = line.substring(1,line.length()).trim();
+        		LogWriter.log("Device Size: " + sizeString);
         		
-        		index = colVals[0];
-        		interfaceType = colVals[1];
-        		model = colVals[2];
-        		size = Double.parseDouble(colVals[3]);
-        		
-        		PhysicalDiskInfo pdi = new PhysicalDiskInfo(index, interfaceType, model, size);
-        		diskInfoList.add(pdi);
+        		if(sizeString.length() > 0)	//check if a size is reported (size is not reported for devices like card readers when no card is inserted)
+        		{
+        			diskSize = Double.parseDouble(sizeString);	//extract size of disk for this index
+
+	        		if(indexModelMapping.containsKey(new Integer(deviceIndex)) && validDeviceIndexMapping.containsKey(new Integer(deviceIndex)))	//if current device is one in the indexmodel mapping (it is valid)
+	        		{
+	        			String model = (String)indexModelMapping.get(new Integer(deviceIndex));
+	        			String interfaceType = (String)validDeviceIndexMapping.get(new Integer(deviceIndex));
+	            		PhysicalDiskInfo pdi = new PhysicalDiskInfo(deviceIndex, interfaceType, model, diskSize);
+	            		diskInfoList.add(pdi);
+	        		}
+	        		else
+	        		{
+	        			LogWriter.log("****WARNING: Current Device is not in indexModelMapping");
+	        		}
+        		}
         	}
-        	else
-        		continue; //skip the column headers
         }
-		    		
-		//convert arraylist into array of comboboxitems
+		//convert arraylist into array of PhysicalDiskInfo structures
 		returnVal = new PhysicalDiskInfo[diskInfoList.size()];
 	    for(int i = 0; i < diskInfoList.size(); i++)
 	    {
 	    	returnVal[i] = (PhysicalDiskInfo)diskInfoList.get(i);
+	    	LogWriter.log("Physical Disk Info " + i + ": " + returnVal[i]);
 	    }
     	   
 	    return returnVal;
+	}
+	
+	/*
+	 * Query WMI Interface for physical devices attached to machine that are USB or Firewire Interface
+	 * 
+	 * Returns mapping of all USB and firewire device indices mapped to their interface type (usb or firewire)
+	 * null indicates the query failed
+	 * 
+	 */
+	private static Map getUsbAndFirewireDeviceIndexMapping()
+	{
+		Map deviceIndexMap = new HashMap();	//mapping of device index to interface
+		
+		//wmic /namespace:\\root\cimv2 path Win32_DiskDrive get index, InterfaceType
+    	String[] cmd = new String[7];
+    	cmd[0] = "wmic";
+    	cmd[1] = "/namespace" + ":\\\\root\\cimv2";	
+    	cmd[2] = "path";
+    	cmd[3] = "Win32_DiskDrive";
+    	cmd[4] = "get";
+    	cmd[5] = "index";
+    	cmd[6] = ",InterfaceType";   	
+		
+		String outputBuffer = callExternalProcess(cmd);
+		
+		if(outputBuffer == null)
+			return null;
+		
+		String[] outputLines = outputBuffer.split(System.getProperty("line.separator"));
+    		
+		int deviceIndex;
+		String interfaceType;
+		
+		String line;
+        for(int i = 0; i < outputLines.length; i++)	//for every output line
+        {
+        	line = outputLines[i].trim();
+        	if(!line.startsWith("Index") && !line.equals(""))	//if line is not a column header line
+        	{	
+        		deviceIndex = Integer.parseInt(line.substring(0,1));	//extract index of this device
+        		interfaceType = line.substring(1,line.length()).trim();	//extract interface type for this index
+        		
+        		//if we found a usb or firewire interface 
+        		if(interfaceType.equalsIgnoreCase("USB") || interfaceType.equalsIgnoreCase("1394"))
+        			deviceIndexMap.put(new Integer(deviceIndex),interfaceType);	//add the device index to the list of usb/1394 device indices
+        	}
+        }
+
+	    return deviceIndexMap;
+	}
+
+	/*
+	 * Create a mapping between the valid physical device indices and their model names
+	 * 
+	 * Returns a map of physical device index numbers to model names
+	 * null indicates the query failed
+	 * 
+	 */
+	private static Map getIndexModelNameDeviceMapping(Map validDeviceIndexMapping)
+	{
+		Map indexToModelNameMap = new HashMap();
+		
+		//wmic /namespace:\\root\cimv2 path Win32_DiskDrive get index, model
+    	String[] cmd = new String[7];
+    	cmd[0] = "wmic";
+    	cmd[1] = "/namespace" + ":\\\\root\\cimv2";	
+    	cmd[2] = "path";
+    	cmd[3] = "Win32_DiskDrive";
+    	cmd[4] = "get";
+    	cmd[5] = "index";
+    	cmd[6] = ",model";   	
+		
+		String outputBuffer = callExternalProcess(cmd);
+		
+		if(outputBuffer == null)
+			return null;
+		
+		String[] outputLines = outputBuffer.split(System.getProperty("line.separator"));
+    		
+		int deviceIndex;
+		String modelName;
+		
+		String line;
+        for(int i = 0; i < outputLines.length; i++)	//for every output line
+        {
+        	line = outputLines[i].trim();
+        	if(!line.startsWith("Index") && !line.equals(""))	//if line is not a column header line
+        	{	
+        		deviceIndex = Integer.parseInt(line.substring(0,1));	//extract index of this device
+        		modelName = line.substring(1,line.length()).trim();	//extract model name for this index
+        		
+        		//only add to map if current device index is a valid one
+        		Set validDeviceIndices = validDeviceIndexMapping.keySet();
+        		Iterator indexIterator = validDeviceIndices.iterator();
+        		while(indexIterator.hasNext())
+        		{
+        			int currValidIndex = ((Integer)indexIterator.next()).intValue();
+        			if(deviceIndex == currValidIndex)	//device index is valid
+        				indexToModelNameMap.put(new Integer(deviceIndex), modelName);
+        		}
+        	}
+        }
+
+	    return indexToModelNameMap;
 	}
 	
 	/*
@@ -2690,7 +2921,7 @@ public class LiveViewLauncher
 		if(isVMWareServer)
 			return installDir + "..\\VMware VIX\\vmrun.exe";
 		else
-			return installDir + "\\vmrun.exe";
+			return installDir + "vmrun.exe";
 	}
 
 	
@@ -2721,7 +2952,7 @@ public class LiveViewLauncher
 
 		String path = queryRegistry("HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\vmware-mount.exe", "Path", "REG_SZ");
 		if(path != null)
-			return path + "\\vmware-mount.exe";
+			return path + "vmware-mount.exe";
 		return path;
 	}
 	
@@ -2742,6 +2973,7 @@ public class LiveViewLauncher
 	 */
 	public static void postError(String line)	//write an error message
 	{
+		LogWriter.log("Error: " + line);
 		messageOutputArea.append("ERROR>     " + line + endL);	//write the error message to out window
 		messageOutputArea.setCaretPosition(messageOutputArea.getText().length());	//scroll down
 	}
@@ -2756,6 +2988,7 @@ public class LiveViewLauncher
 		{
             public void run() 
             {
+            	LogWriter.log("Output: " + fLine);
                 messageOutputArea.append(fLine);	//output console line
                 // Scroll down as text is output
                 messageOutputArea.setCaretPosition(messageOutputArea.getText().length());

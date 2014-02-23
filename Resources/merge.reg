@@ -1,7 +1,5 @@
 Windows Registry Editor Version 5.00
 
-;Credit: Michael A Penhallurick of Cranfield University
-
 [HKEY_LOCAL_MACHINE\NEWSYSTEM\ControlSet001\Control\CriticalDeviceDatabase\pci#ven_8086&dev_1222]
 "ClassGUID"="{4D36E96A-E325-11CE-BFC1-08002BE10318}"
 "Service"="intelide"
@@ -29,8 +27,6 @@ Windows Registry Editor Version 5.00
 [HKEY_LOCAL_MACHINE\NEWSYSTEM\ControlSet001\Control\CriticalDeviceDatabase\pci#ven_8086&dev_7199]
 "ClassGUID"="{4D36E96A-E325-11CE-BFC1-08002BE10318}"
 "Service"="intelide"
-
-;Add driver for intelide (requires intelide.sys in drivers directory)
 
 [HKEY_LOCAL_MACHINE\NEWSYSTEM\ControlSet001\Services\IntelIde]
 "ErrorControl"=dword:00000001

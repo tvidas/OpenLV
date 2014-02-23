@@ -77,8 +77,9 @@ public class PartitionEntry
 		return (cylSectStructure & 63);
 	}
 	
-	/* Extract 10bit cylinder from Cylinder/Sector 16bit structure  
-	 * */
+	/* 
+	 * Extract 10bit cylinder from Cylinder/Sector 16bit structure  
+	 */
 	private static int getCylinder(int cylSectStructure)
 	{		
 		int bits8To15 = ((cylSectStructure & 65280) >> 8);
@@ -189,4 +190,22 @@ public class PartitionEntry
 	{
 		return (partitionType == 0x07);
 	}
+
+	public String toString()
+	{
+		StringBuffer sb = new StringBuffer();
+		sb.append("Is Bootable: " + isBootable() + System.getProperty("line.separator"));
+		sb.append("Begin Head: " + beginHead + System.getProperty("line.separator"));		
+		sb.append("Begin Cylinder: " + getCylinder(beginCylinderSector) + System.getProperty("line.separator"));		
+		sb.append("Begin Sector: " + getSector(beginCylinderSector) + System.getProperty("line.separator"));		
+		sb.append("Partition Type: " + "0x" + Integer.toHexString(partitionType) + System.getProperty("line.separator"));		
+		sb.append("End Head: " + endHead + System.getProperty("line.separator"));		
+		sb.append("End Cylinder: " + getCylinder(endCylinderSector) + System.getProperty("line.separator"));		
+		sb.append("End Sector: " + getSector(endCylinderSector) + System.getProperty("line.separator"));		
+		sb.append("Relative Sector: " + relativeSector + System.getProperty("line.separator"));		
+		sb.append("Num Sectors: " + numSectors + System.getProperty("line.separator"));		
+		
+		return sb.toString();
+	}
+	
 }

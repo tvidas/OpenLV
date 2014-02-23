@@ -1,6 +1,6 @@
 
 !define PRODUCT_NAME "Live View"
-!define PRODUCT_VERSION "0.4"
+!define PRODUCT_VERSION "0.5"
 
 ;Government or Public
 !define PRODUCT_EDITION "Public"
@@ -70,21 +70,12 @@ Section "MainSection" SEC01
 
   CreateShortCut "$DESKTOP\${PRODUCT_NAME} ${PRODUCT_VERSION}.lnk" $R0 "-jar LiveView${PRODUCT_EDITION}.jar" "$INSTDIR\Resources\app.ico" 0
   CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME} ${PRODUCT_VERSION}.lnk" $R0 "-jar LiveView${PRODUCT_EDITION}.jar" "$INSTDIR\Resources\app.ico" 0
-  File "${BASE_DIRECTORY}\LiveViewHelp.html"
   SetOutPath "$INSTDIR\Resources"
   File "${BASE_DIRECTORY}\Resources\generic.mbr"
   File "${BASE_DIRECTORY}\Resources\genericW98Me.mbr"
-;  File "${BASE_DIRECTORY}\Resources\icon.ico"
   File "${BASE_DIRECTORY}\Resources\app.ico"
   File "${BASE_DIRECTORY}\Resources\LVSmallIcon.gif"
-;  File "${BASE_DIRECTORY}\Resources\intelide.sys"
   File "${BASE_DIRECTORY}\Resources\merge.reg"
-;  SetOutPath "$INSTDIR\Resources\VMMount"
-;  File "${BASE_DIRECTORY}\Resources\VMMount\libeay32.dll"
-;  File "${BASE_DIRECTORY}\Resources\VMMount\msvcp71.dll"
-;  File "${BASE_DIRECTORY}\Resources\VMMount\msvcr71.dll"
-;  File "${BASE_DIRECTORY}\Resources\VMMount\ssleay32.dll"
-;  File "${BASE_DIRECTORY}\Resources\VMMount\vmware-mount.exe"
 SectionEnd
 
 Section -AdditionalIcons
@@ -280,12 +271,13 @@ FunctionEnd
 Section Uninstall
   Delete "$INSTDIR\${PRODUCT_NAME}.url"
   Delete "$INSTDIR\uninst.exe"
+  Delete "$INSTDIR\TempWmicBatchFile.bat"
+  Delete "$INSTDIR\MostRecentRun.log"
   Delete "$INSTDIR\Resources\merge.reg"
   Delete "$INSTDIR\Resources\app.ico"
   Delete "$INSTDIR\Resources\LVSmallIcon.gif"
   Delete "$INSTDIR\Resources\genericW98Me.mbr"
   Delete "$INSTDIR\Resources\generic.mbr"
-  Delete "$INSTDIR\LiveViewHelp.html"
   Delete "$INSTDIR\LiveView${PRODUCT_EDITION}.jar"
 
   Delete "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall.lnk"
