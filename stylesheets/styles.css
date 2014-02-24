@@ -138,6 +138,12 @@ header ul a {
   height:40px;
 }
 
+header a.active {
+  font-size:13px;
+  font-weight:700;
+  
+}
+
 strong {
   color:#222;
   font-weight:700;

@@ -1,0 +1,300 @@
+---
+layout: default
+title: Quick Start
+weight: 5 
+---
+        <section>
+        <h3>
+<a name="quick-start" class="anchor" href="#quick-start"><span class="octicon octicon-link"></span></a>Quick Start.</h3>
+
+  <p class="emphasis">
+  This guide should serve as a quick way to get up to speed with OpenLV.
+  </p>
+
+  <ul class="faqindex">
+	<li>
+	  <a href="#Step 1 - Set VM Parameters">Step 1 - Set VM Parameters</a>
+    </li>
+	<li>
+	  <a href="#Step 2 - Select Image or Device">Step 2 - Select Image or Device</a>
+	</li>
+	<li>
+	  <a href="#Step 3 - Select Output Directory">Step 3 - Select Output Directory</a>
+	</li>
+	<li>
+	  <a href="#Step 4 - Launch or Generate VM">Step 4 - Launch or Generate VM</a>
+	</li>
+    <li>
+	  <a href="#Step 5 - Click Start">Step 5 - Click Start</a>
+	</li>
+	<p/>
+    <li>
+	  <a href="#Other - Message Prompts">Other - Message Prompts</a>
+	</li>
+    <li>
+	  <a href="#Other - Interacting With the VM">Other - Interacting With the VM</a>
+	</li>
+  </ul>
+  <p class="emphasis">
+  Thanks to OpenLV users, this guide is also available in the following language:
+  </p>
+
+  <ul class="faqindex">
+	<li>
+	  <a href="quickstart_it.html">Italiano</a>
+      </li>
+  </ul>
+
+  <a name="Step 1 - Set VM Parameters"></a>
+  <h3>Step 1 - Set VM Parameters</h3>
+  <br/>
+  <img src="images/inputparams.png"/>
+  <p class="emphasis">
+    First select your Set VM Parameters:
+    <ul>
+      <li>
+        RAM Size:<p/>
+        The amount of RAM on your computer allocated to the
+        virtual machine. Ideally this value should match the amount of RAM
+        that was installed on the machine from which you created your image, but clearly
+        must be smaller than the amount of RAM on your machine running OpenLV.
+      </li>
+      <li>
+        Operating System:<p/>
+        This is the operating system contained on the disk
+        image or physical disk you are trying to boot. Note that the Auto Detection
+        feature only works for full disk images (not partitions). OpenLV is fairly
+        forgiving about incorrectly identifying the OS so you may be able to get away with
+        choosing any OS that is similar to the actual OS contained on the disk image.
+      </li>
+      <li>
+        System Time:<p/>
+        The is the date/time used by the system during boot time. Ideally, this
+        should be set to the date/time at which the image was created to minimize the impact of
+        potential time-trial or time-bomb software on the system.
+      </li>
+    </ul>
+  </p>
+
+  <a name="Step 2 - Select Image or Device"></a>
+  <h3>Step 2 - Select Image or Device</h3>
+  <br/>
+  <img src="images/inputimage.png"/>
+  <p class="emphasis">
+    If you would like to boot from a disk image file, click the Browse button to select the image of the machine from which you would like to boot:
+    <ul>
+      <li>
+		Make sure this is a bit-for-bit "raw" disk or partition image. If it is not, you may use a third party image mounting tool such as
+		<a href="http://www.mountimage.com/">Mount Image Pro</a> or <a href="http://www.guidancesoftware.com/products/ef_modules.asp#pde">Physical Disk Emulator</a>
+		to mount the image and boot it as a physical disk (see below).
+      </li>
+      <p/>
+      <li>
+        The image may be located on your local machine, an encrypted network share,
+        or anywhere you can navigate to in a standard Windows "browse" dialog box.
+      </li>
+      <p/>
+      <li>
+		You may use "split" or "chunked" images by multi-selecting all of the chunks
+		with CTRL+Click or SHIFT+Click in the browse dialog box. Some imaging programs
+		split the image into chunks so they can easily fit on a CD, DVD, or FAT filesystem.
+		Just make sure you select all of the associated chunks and that their file extensions
+		are either numeric or alphabetical as OpenLV will order them by sorting their file extensions.
+      </li>
+    </ul>
+    <p class="emphasis">If, however, you would like to boot from a physical disk select the physical disk option</p>
+  </p>
+  <br/>
+  <img src="images/inputdevice.png"/>
+  <p class="emphasis">
+    Select the device from which you would like to boot from the drop-down menu:
+    <ul>
+      <li>
+		The physical disk can be connected directly to the machine running OpenLV or connected via a USB or FireWire bridge.
+		This bridge can also be a writeblocker (for an added layer of protection)
+		as OpenLV only needs read access to the device. You may also use third party image mounting software to access an image as a physical disk.
+      </li>
+      <p/>
+      <li>
+		If you do not see your device in the drop-down menu, make sure it is connected to your machine. You may want
+		to check that it has been recognized by Windows and shows up as a "drive letter" on your system. You may need
+		to select the image file option and reselect the physical device option to re-populate the drop-down menu with
+		the most current list of connected devices.
+      </li>
+    </ul>
+  </p>
+
+  <a name="Step 3 - Select Output Directory"></a>
+  <h3>Step 3 - Select Output Directory</h3>
+  <br/>
+  <img src="images/outputdir.png"/>
+  <p class="emphasis">
+    Next, select the output directory by clicking the browse button:
+    <ul>
+      <li>
+		The output directory is where all of the files representing the virtual machine will be placed.
+		This includes the configuration files and the "overlay" file containing all of the changes that
+		would have been made to the original disk or image.
+      </li>
+      <p/>
+      <li>
+		This directory could be on your local machine, network share, or anywhere you can navigate to
+		from a standard Windows "browse" dialog box.
+      </li>
+      <p/>
+      <li>
+		The virtual machine grows in size as it is used (because all of the writes made to disk
+		are saved in the "overlay" file in this directory). Initially you will require at least a
+		few hundred megabytes of free space for the virtual machine but you may want to choose a
+		directory with a few gigabytes of free space if you plan to make heavy use of the virtual
+		machine.
+      </li>
+    </ul>
+  </p>
+
+  <a name="Step 4 - Launch or Generate VM"></a>
+  <h3>Step 4 - Launch or Generate VM</h3>
+  <br/>
+  <img src="images/inputlaunchorgenerate.png"/>
+  <p class="emphasis">
+    Next choose what you would like to do with your image
+    <ul>
+      <li>
+        Launch My Image:<p/>
+		By selecting this option, OpenLV will create the VMware virtual machine out of your
+		disk image and launch it in VMware.
+      </li>
+      <li>
+        Generate Config Only:<p/>
+		By selecting this option, OpenLV will create the VMware virtual machine out of your
+		disk image but will not automatically launch it in VMware. With this option you can simply
+		navigate to your output directory selected in the previous step and double click the .vmx
+		file With the same prefix as your image file to launch the virtual machine manually.
+      </li>
+    </ul>
+  </p>
+
+  <a name="Step 5 - Click Start"></a>
+  <h3>Step 5 - Click Start</h3>
+  <br/>
+  <img src="images/actionbuttons.png"/>
+  <p class="emphasis">
+    Finally, click the start button and let OpenLV take care of the rest
+    <ul>
+      <li>
+		Launching an image typically takes under thirty seconds. The messages window
+		will provide you with updates on its progress.
+      </li>
+      <p/>
+      <li>
+		The messages window will report any problems encountered during the process
+		that may have prevented OpenLV from successfully creating your virtual machine.
+      </li>
+      <p/>
+      <li>
+		Clicking the clear button will clear the messages window.
+      </li>
+    </ul>
+  </p>
+
+  <a name="Other - Message Prompts"></a>
+  <h3>Message Prompts</h3>
+  <br/>
+  <img src="images/msgreadonly.png"/>
+  <p class="emphasis">
+    You may get a "read only" message prompt
+    <ul>
+      <li>
+		If you attempt to create a virtual machine out of a raw disk image, OpenLV will
+		automatically check if that file has the read-only flag set. If it does not, you
+		will be asked whether or not you would like to set the file as read-only. Click yes
+		to set the read-only flag on your image file(s) or click no to leave them alone.
+      </li>
+      <p/>
+      <li>
+		Note that setting the read-only flag on your file(s) is just an extra layer of protection
+		against the accidental modification of your image file(s). OpenLV will not modify your images
+		if you choose not to set the read-only flag. Also note that setting the read-only flag on your image
+		file(s) will not modify their cryptographic hash.
+      </li>
+    </ul>
+  </p>
+  <br/>
+  <img src="images/msgpreviouslaunch.png"/>
+  <p class="emphasis">
+    You may also receive a "previous launch" message prompt
+    <ul>
+      <li>
+		If this is not the first time you have launched your disk image, you will receive a prompt asking you
+		if you would like to either continue With the old virtual machine or start over by generating a new one.
+      </li>
+      <p/>
+      <li>
+		If you choose "continue", OpenLV will simply reuse the old virtual machine it generated. This virtual machine will contain
+		all of the changes you have made (changed MAC times, installed software, etc) that were contained in the "overlay" file.
+      </li>
+      <p/>
+      <li>
+		If you choose "start over", OpenLV will delete the old virtual machine and generate a completely new one. This means
+		that all of the changes you made to the machine will be wiped away and you will be booting the image or physical disk
+		from its original pristine state (with a fresh, blank "overlay" file).
+      </li>
+    </ul>
+  </p>
+
+  <a name="Other - Interacting With the VM"></a>
+  <h3>Interacting With the Virtual Machine</h3>
+  <br/>
+  <img src="images/xpsystem.jpg"/>
+  <p class="emphasis">
+    Now you can interact With the machine as you would any other. You can install software,
+    insert CD's or USB keys, read/modify/create files, etc.
+    <ul>
+      <li>
+		To use the machine, you must click inside the VMware window to give it
+		"focus." You mouse movements will be inside the virtual machine until you release
+		it by using the keyboard combination CTRL+ALT.
+      </li>
+      <p/>
+      <li>
+		To make the machine full screen, use the keyboard combination: CTRL+ALT+ENTER.
+		To go back to the smaller view, use the keyboard combination CTRL+ALT.
+      </li>
+      <p/>
+      <li>
+		To stop the virtual machine you may click the red square which is equivalent to
+		pulling the power plug on a system.
+      </li>
+      <p/>
+      <li>
+		When you are done working With the machine, you can simply shut it down or hit the red
+		square on the VMware GUI. To boot the machine back up again with all of the changes you
+		have made, you can either navigate to your output directory and double click the .vmx file
+		for your image or you can use the OpenLV GUI and select "continue" when prompted to start over
+		or continue where you left off.
+      </li>
+      <p/>
+      <li>
+		If you want to remove all of your changes and start from scratch again, simply hit the
+		red square to shut off the virtual machine and then close the VMware window. Go back to
+		the OpenLV GUI and re-launch your image or disk. When prompted to "continue or start over",
+		be sure to select "start over." This will boot the machine from its original unmodified state.
+      </li>
+      <p/>
+      <li>
+		The machine may go through a variety of hardware detection steps. This is because
+		the system is recognizing all of the new hardware (VMware virtual hardware) present
+		on the machine.
+      </li>
+      <p/>
+      <li>
+		For better performance (and higher resolution) you can install the VMware tools. To do this,
+		click VM->Install VMware Tools on the VMware menu. This will require a reboot of the Virtual Machine
+		but will provide much smoother performance once installed.
+      </li>
+    </ul>
+  </p>
+
+
+
+        </section>

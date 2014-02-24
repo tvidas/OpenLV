@@ -1,34 +1,330 @@
 ---
 layout: default
 title: FAQ 
+weight: 5
 ---
         <section>
         <h3>
-<a name="welcome-to-openlv" class="anchor" href="#welcome-to-openlv"><span class="octicon octicon-link"></span></a>Welcome to OpenLV.</h3>
+<a name="frequently-asked-questions" class="anchor" href="#frequently-asked-questions"><span class="octicon octicon-link"></span></a>Frequently asked Questions.</h3>
 
-<p>OpenLV is a Java-based graphical forensics tool that creates a virtual machine out of a raw (dd-style) disk image or physical disk. This allows the forensic examiner to "boot up" the image or disk and gain an interactive, user-level perspective of the environment, all without modifying the underlying image or disk. Because all changes made to the disk are written to a separate file, the examiner can instantly revert all of his or her changes back to the original pristine state of the disk. The end result is that one need not create extra "throw away" copies of the disk or image to create the virtual machine.</p>
 
-<h4>
-<a name="openlv-is-capable-of-booting" class="anchor" href="#openlv-is-capable-of-booting"><span class="octicon octicon-link"></span></a>OpenLV is capable of booting</h4>
+	<ul class="faqindex">
+	  <li>
+		<a href="#What is OpenLV?">What is OpenLV?</a>
+      </li>
+	  <li>
+		<a href="#Won't Booting The Image Destroy Evidence?">Wont Booting The Image Destroy Evidence?</a>
+	  </li>
+	  <li>
+		<a href="#How Do I Run OpenLV?">How Do I Run OpenLV?</a>
+	  </li>
+	  <li>
+		<a href="#What Image Formats Does OpenLV Handle?">What Image Formats Does OpenLV Handle?</a>
+	  </li>
+	  <li>
+		<a href="#What Types of Imaged Systems Can Be Booted?">What Types of Imaged Systems Can Be Booted?</a>
+	  </li>
+	  <li>
+		<a href="#What if I Only Have an Image of the Bootable Partition and Not the Entire Disk?">What if I Only Have an Image of the Bootable Partition and Not the Entire Disk?</a>
+	  </li>
+	  <li>
+		<a href="#Does OpenLV Handle Split Images?">Does OpenLV Handle Split Images?</a>
+	  </li>
+	  <li>
+		<a href="#Does OpenLV Support Dual Boot Images?">Does OpenLV Support Dual Boot Images?</a>
+	  </li>
+	  <li>
+		<a href="#What Do I Need To Run OpenLV?">What Do I Need To Run OpenLV?</a>
+	  </li>
+	  <li>
+		<a href="#How Do I Make The Virtual Machine Feel Less Sluggish?">How Do I Make The Virtual Machine Feel Less Sluggish?</a>
+	  </li>
+	  <li>
+		<a href="#Why Can't I Access The Internet From The Virtual Machine?">Why Can't I Access The Internet From The Virtual Machine?</a>
+	  </li>
+	  <li>
+		<a href="#How Can I Transfer Files To And From The Virtual Machine Without Internet Access?">How Can I Transfer Files To And From The Virtual Machine Without Internet Access?</a>
+	  </li>
+	  <li>
+		<a href="#Why Am I Being Asked To Install Drivers for New Hardware?">Why Am I Being Asked To Install Drivers for New Hardware?</a>
+	  </li>
+	  <li>
+		<a href="#Why Am I Being Asked To Activate The Target OS?">Why Am I Being Asked To Activate The Target OS?</a>
+	  </li>
+	  <li>
+		<a href="#How Do I Remove All My Changes And Start From Scratch Again?">How Do I Remove All My Changes And Start From Scratch Again?</a>
+	  </li>
+	  <li>
+		<a href="#I Have a Feature Request, Who Do I Contact?">I Have a Feature Request, Who Do I Contact?</a>
+	  </li>
+	  <li>
+	  	<a href="#Does OpenLV Require Admin Privileges To Run?">Does OpenLV Require Admin Privileges To Run?</a>
+	  </li>
 
-<ul>
-<li>Full disk raw images</li>
-<li>Bootable partition raw images</li>
-<li>Physical Disks (attached via a USB or Firewire bridge)</li>
-<li>Specialized and closed image formats (using 3rd party image mounting software)</li>
-<li>Containing the following operating systems
+	</ul>
 
-<ul>
-<li>Windows (7, 2008, Vista, 2003, XP, 2000, NT, Me, 98)</li>
-<li>Linux (limited support)</li>
-</ul>
-</li>
-</ul><h4>
-<a name="openlv-is-compatible-with-on-windows-or-linux-examination-machines0" class="anchor" href="#openlv-is-compatible-with-on-windows-or-linux-examination-machines0"><span class="octicon octicon-link"></span></a>OpenLV is compatible with (on Windows or Linux examination machines0</h4>
 
-<ul>
-<li>VirtualBox</li>
-<li>VMware Workstation</li>
-<li>VMware Server (1.x only)</li>
-</ul><p>Behind the scenes, Live View automates a wide array of technical tasks. Some of these include: resolving hardware conflicts resulting from booting on hardware other than that on which the OS was originally installed; creating a customized MBR for partition-only images; and correctly specifying a virtual disk to match the original image or physical disk.</p>
+		<a name="What is OpenLV?"></a>
+        <h4>What is OpenLV?</h4
+        <p>
+        <ul>
+          <li>
+            OpenLV is a tool that allows disk images or physical drives to be booted
+            up in a virtual machine and examined in a forensically sound manner.
+ 		  </li>
+        </ul>
+        </p>
+
+		<a name="Won't Booting The Image Destroy Evidence?"></a>
+        <h4>Won't Booting The Image Destroy Evidence?</h4>
+        <p>
+          <ul>
+            <li>
+              No, OpenLV redirects all changes to a scratch file
+              leaving the original image untouched. OpenLV works just fine on
+              images set as read-only and will even alert the user if the image they
+              are booting is not set as such. One can also run a cryptographic checksum
+              on the image before and after booting with OpenLV to
+              verify the integrity of the evidence.
+            </li>
+          </ul>
+        </p>
+
+		<a name="How Do I Run OpenLV?"></a>
+        <h4>How Do I Run OpenLV?</h4>
+        <p>
+          <ul>
+            <li>
+              First install OpenLV by double-clicking the installer. It will check your system for all of the
+              requirements and install them as necessary. When the installation completes, you should be able to
+              simply double-click the OpenLV icon on your desktop to start the program.
+            </li>
+            <li>
+              Developers and advances users are encuraged to download the current state of the software from
+              <a href='https://github.com/tvidas/OpenLV'>github</a>.
+            </li>
+          </ul>
+        </p>
+
+		<a name="What Image Formats Does OpenLV Handle?"></a>
+        <h4>What Image Formats Does OpenLV Handle?</h4>
+        <p>
+          <ul>
+            <li>
+              OpenLV handles exact bit-for-bit (raw) images of disks such
+              as those created with 'dd'. OpenLV is also capable of booting
+              physical disks (not images) attached to the computer directly or via
+              a USB or FireWire bridge. Other image formats (such as EnCase) are not
+              directly supported, but can be booted as physical disks with the use of
+              third party image mounting software such as <a href="http://www.mountimage.com/">Mount Image Pro</a>
+              or <a href="http://www.guidancesoftware.com/products/ef_modules.asp#pde">Physical Disk Emulator</a>. Images
+              can also often be converted to standard bit-for-bit images. For example, the
+              FTK Imager <a href="http://www.accessdata.com/support/">http://www.accessdata.com/support/</a>
+              can convert Encase images into a standard DD image for use with OpenLV.
+		    </li>
+		  </ul>
+        </p>
+
+		<a name="What Types of Imaged Systems Can Be Booted?"></a>
+        <h4>What Types of Imaged Systems Can Be Booted?</h4>
+          <ul>
+            <li>Fundamentally, OS limitations are not due to OpenLV, but are due to the underlying virtualization
+                software - though some OpenLV features only apply to certain versions of Windows.  OpenLV is known 
+                to work with:</li> 
+          <ul>
+            <li>Windows 7</li>
+            <li>Windows Server 2008</li>
+            <li>Windows Vista</li>
+            <li>Windows XP</li>
+            <li>Windows 2000</li>
+            <li>Windows Server 2003</li>
+            <li>Windows NT (Partial Support)</li>
+            <li>Windows Me</li>
+            <li>Windows 98</li>
+            <li>Linux (Partial Support)</li>
+
+          </ul>
+          </ul>
+
+        <p>
+          <ul>
+            <li>
+              While the above has been verified, we have both a
+              limited set of hardware and system images with which to
+              test OpenLV. We would love receive your feedback on what
+              types of images have worked, failed, and what types you
+              would like to see supported in the future.
+            </li>
+          </ul>
+        </p>
+
+		<a name="What if I Only Have an Image of the Bootable Partition and Not the Entire Disk?"></a>
+        <h4>What if I Only Have an Image of the Bootable Partition and Not the Entire Disk?</h4>
+        <p>
+          <ul>
+            <li>
+              No problem. OpenLV will automatically detect this and
+              build a Master Boot Record for your partition allowing it
+              to boot.
+            </li>
+          </ul>
+		</p>
+
+		<a name="Does OpenLV Handle Split Images?"></a>
+        <h4>Does OpenLV Handle Split Images?</h4>
+        <p>
+          <ul>
+            <li>
+		      Yes, simply select all of the chunks in the browse dialog by using Ctrl + Click. OpenLV sorts the chunks
+		      by their file extensions so be sure that the chunks have either numerically or alphabetically ordered file extensions.
+            </li>
+          </ul>
+        </p>
+
+		<a name="Does OpenLV Support Dual Boot Images?"></a>
+        <h4>Does OpenLV Support Dual Boot Images?</h4>
+        <p>
+          <ul>
+            <li>
+              Yes, there is full support for the primary operating
+              system on the machine and partial support for the secondary
+              operating system. If you need to boot the secondary OS,
+              simply choose the primary OS in the OpenLV dropdown menu
+              and wait for the OS selection screen to come up while the
+              system is booting. From there, select to boot the secondary
+              OS. In some cases, you may experience a blue screen error
+              which will be fixed once full dual boot support is
+              implemented.
+            </li>
+          </ul>
+        </p>
+
+		<a name="What Do I Need To Run OpenLV?"></a>
+        <h4>What Do I Need To Run OpenLV?</h4>
+        <ul>
+            <li>Virtualization software, either <a href="https://www.virtualbox.org/">VirtualBox</a> or a VMware product - VMware Server 1.x Full Install* (<a href="http://www.vmware.com/download/server/">Free Download</a>) or VMware Workstation 5.5+ (<a href="http://www.vmware.com/download/ws/">30 Day Trial</a>)</li>
+
+            <li>Java Runtime Environment (<a href="http://www.java.com/getjava/">http://www.java.com/getjava/</a>)</li>
+
+			<li>VMware Disk Mount Utility, part of the VDDK (<a href="http://www.vmware.com/support/developer/vddk/">http://www.vmware.com/support/developer/vddk/</a>)</li>
+
+            <li>A "host" examination machine, either Linux or Microsoft Windows Machine (XP, 2000, 2003, Vista, 2008, etc)</li>
+
+            <li>Some Bit-for-Bit Disk Images</li>
+        </ul>
+
+		<a name="How Do I Make The Virtual Machine Feel Less Sluggish?"></a>
+        <h4>How Do I Make The Virtual Machine Feel Less Sluggish?</h4>
+        <p>
+          <ul>
+            <li>
+              Virtual Machines are inherently slower than their hardware counterparts. You can, however, make them feel more
+              responsive by installing virtualization tools into the guest. To do so, in VMware wait until the Virtual Machine boots 
+              and then from the VMware Menu select VM->Install VMware Tools. This will require a reboot of the VM.
+            </li>
+            <li>
+              You can also ensure that your examination machine is speedy, has ample free space, and has a hardware that specifically
+              supports virtualization (such as Intel VT).
+          </ul>
+        </p>
+
+		<a name="Why Can't I Access The Internet From The Virtual Machine?"></a>
+        <h4>Why Can't I Access The Internet From The Virtual Machine?</h4>
+        <p>
+          <ul>
+            <li>
+		      The virtual Ethernet device is purposely disabled to prevent any malware on the virtual machine
+	      	  from spreading or communicating with external hosts once the image has booted.  If you need this
+                  capability, after OpenLV creates a virtual machine, you can modify the virtual machine settings.
+            </li>
+          </ul>
+        </p>
+
+		<a name="How Can I Transfer Files To And From The Virtual Machine Without Internet Access?"></a>
+        <h4>How Can I Transfer Files To And From The Virtual Machine Without Internet Access?</h4>
+        <p>
+          <ul>
+            <li>
+              One way to transfer files between the Virtual Machine and host computer is to install virtualization tools. To do so in VMware,
+              wait until the Virtual Machine boots. On the VMware menu, click VM->Install VMware Tools. Follow the installation
+              wizard to completion. When the installation finishes, you will be required to reboot the Virtual Machine. For quick
+              one time copies, a USB storage device is probably the most convenient option. Insert the device while the Virtual Machine has
+              the focus and on the VMware menu, click VM->Removable Devices->USB Devices and select your USB device. You should also be able
+              to read and transfer files from the CD Drive inside the virtual machine.
+            </li>
+          </ul>
+        </p>
+
+		<a name="Why Am I Being Asked To Install Drivers for New Hardware?"></a>
+        <h4>Why Am I Being Asked To Install Drivers for New Hardware?</h4>
+        <p>
+          <ul>
+            <li>
+              Operating Systems typically install drivers for the specific set of hardware on which the OS was originally installed. Similar to taking the
+              disk out of one system and booting it up inside a system with different hardware, a virtual machine's virtual hardware will not often match the hardware on which the system was
+              originally installed. For this reason, the OS will attempt to install the missing drivers for that new hardware. If you are prompted for
+              an install CD you may be able to simply hit cancel and continue booting.
+            </li>
+          </ul>
+        </p>
+
+		<a name="Why Am I Being Asked To Activate The Target OS?"></a>
+        <h4>Why Am I Being Asked To Activate The Target OS?</h4>
+        <p>
+          <ul>
+            <li>
+	          Windows activation is often triggered by "significant" hardware changes in the machine. Weights are assigned to various pieces of hardware
+		      and thresholds are set for things like RAM size to determine what is considered a change worthy of requiring reactivation.
+		      When booting the target image, Windows may detect VMware's virtual hardware (or lack thereof in the case of the NIC) as a significant hardware
+		      change and may require reactivation to log in. For most systems you will be given a grace period which can subsequently be reset an infinite number
+		      of times by re-launching the machine "from scratch." Some systems (such as XP without any service packs) may provide no grace period in which case
+		      you may need to reactivate the OS. Also, by setting the input parameters for OpenLV (such as RAM size) to match the original hardware as closely
+		      as possible, you may decrease the probability of triggering the Windows activation process. More information about Windows activation can be found in the
+		      <a href="http://www.microsoft.com/piracy/activation_faq.mspx">Microsoft Product Activation FAQ</a>.
+            </li>
+          </ul>
+        </p>
+
+		<a name="How Do I Remove All My Changes And Start From Scratch Again?"></a>
+        <h4>How Do I Remove All My Changes And Start From Scratch Again?</h4>
+		<p>
+		  <ul>
+		    <li>
+		      If you are working on a system and decide you would like to revert back to the original, click the red stop button in the VMware
+		      window and close VMware. Go back to OpenLV and enter in the new options you would like to use and hit the start button. When prompted
+		      to continue where you left off or start over, simply select start over and the original image will boot back up without all of the changes that
+		      you made while working with it previously.
+            </li>
+          </ul>
+        </p>
+
+		<a name="I Have a Feature Request, Who Do I Contact?"></a>
+        <h4>I Have a Feature Request, Who Do I Contact?</h4>
+        <p>
+          <ul>
+            <li>
+              We would love to hear your feedback on what is useful,
+              what needs to improve, and what you would like to see in
+              future releases of OpenLV. The best way to make such reqests is 
+              through GitHub's <a href="https://github.com/tvidas/OpenLV/issues">Issues</a> page.
+            </li>
+          </ul>
+        </p>
+
+    	<a name="Does OpenLV Require Admin Privileges To Run?"></a>
+        <h4>Does OpenLV Require Admin Privileges To Run?</h4>
+        <p>
+          <ul>
+            <li>
+				Yes, unfortunately OpenLV requires Administrator privileges to run. This is
+				because it performs a number of necessary admin only operations (i.e. temporarily
+				loading and unloading registry hives on the host system) in preparing an image to
+				boot in the virtual environment.
+			</li>
+          </ul>
+          </p>
+
+          * Server 2.x is NOT supported currently.
+
+
         </section>

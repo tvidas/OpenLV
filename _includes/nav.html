@@ -1,0 +1,15 @@
+<h3> Site Menu </h3>
+{% for weight in (1..100) %}
+  {% for p in site.pages %}
+    {%if p.weight == weight %}
+      {% if p.url contains "_" %}
+      
+      {% else %}
+      <a {% if p.url == page.url %}class="active"{% endif %} href="{{ p.url }}">
+        {{ p.title }}
+      </a><br>
+      {% endif %}
+    {% endif %}
+  {% endfor %}
+{% endfor %}
+

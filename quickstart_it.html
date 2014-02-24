@@ -1,0 +1,151 @@
+---
+layout: default
+title: Quick Start
+weight: 5 
+---
+        <section>
+        <h3>
+<a name="quick-start" class="anchor" href="#quick-start"><span class="octicon octicon-link"></span></a>Quick Start.</h3>
+
+
+  <p class="emphasis">
+  Questa guida vi spiegherà rapidamente come utilizzare Live View.
+  </p>
+
+  <ul class="faqindex">
+	<li>
+	  <a href="#Step 1 - Set VM Parameters">Step 1 - configurare i parametri della macchina virtuale</a>
+    </li>
+	<li>
+	  <a href="#Step 2 - Select Image or Device">Step 2 - selezionare un'immagine o un disco</a>
+	</li>
+	<li>
+	  <a href="#Step 3 - Select Output Directory">Step 3 - selezionare la cartella di destinazione</a>
+	</li>
+	<li>
+	  <a href="#Step 4 - Launch or Generate VM">Step 4 - avviare o creare la macchina virtuale</a>
+	</li>
+    <li>
+	  <a href="#Step 5 - Click Start">Step 5 - cliccare su "Start"</a>
+	</li>
+	<p/>
+  </ul>
+
+  <a name="Step 1 - Set VM Parameters"></a>
+  <h3>Step 1 - Configurare i parametri della macchina virtuale</h3>
+  <br/>
+  <img src="images/inputparams.png"/>
+  <p class="emphasis">
+   Prima di tutto occorre specificare alcuni parametri della Virtual Machine (VM):
+    <ul>
+      <li>
+        dimensione della RAM:<p/>
+        Definisce la dimensione della memoria RAM assegnata alla macchina virtuale. Sarebbe preferibile configurare questo parametro con un valore identico a quello della macchina "reale" dalla quale è stata tratta l'immagine da virtualizzare. Ovviamente può essere un valore inferiore, in funzione della memoria che avete sulla macchina dove lancerete Live View.
+      </li>
+      <li>
+       sistema operativo:<p/>
+        Specifica il sistema operativo contenuto nell'immagine o nel disco fisico che proverete ad avviare. Ricordate che l'auto riconoscimento funziona solo per le immagini complete del disco (non per le partizioni). Live View è in grado di tollerare eventuali errori nella definizione del sistema operativo, rispetto a quello che riscontrerà effettivamente sull'immagine o sul disco.
+      </li>
+      <li>
+       data e ora del sistema<p/>
+        Indica la data e l'ora del sistema da usare durante l'avvio. È preferibile configurare la data e l'ora del sistema relativa al momento quando è stata creata l'immagine, per minimizzare il rischio di eventuali malfuzionamenti dovuti a programmi "time-trial" o "bombe a tempo" presenti sul sistema da analizzare..
+      </li>
+    </ul>
+  </p>
+
+  <a name="Step 2 - Select Image or Device"></a>
+  <h3>Step 2 - selezionare un'immagine o un disco</h3>
+  <br/>
+  <img src="images/inputimage.png"/>
+  <p class="emphasis">
+    Selezionate il bottone "Browse" per individuare l'immagine che volete lanciare::
+    <ul>
+      <li>
+		Assicuratevi che questa sia una copia "bit-a-bit" del disco o della partizione. In caso contrario, utilizzate strumenti appositi come Mount Image Pro o Physical Disk Emulator per montare l'immagine e avviarla come un disco fisico.
+		<a href="http://www.mountimage.com/">Mount Image Pro</a> or <a href="http://www.guidancesoftware.com/products/ef_modules.asp#pde">Physical Disk Emulator</a>
+      </li>
+      <p/>
+      <li>
+        L'immagine può essere collocata sul vostro calcolatore oppure su una condivisione di rete locale (criptata), in ogni caso potete utilizzare Gestione Risorse di Windows per individuarla.
+      </li>
+      <p/>
+      <li>
+		Potete usare immagini suddivise in più parti selezionando ciascun file tramite la funzione di "selezione multipla" (multi select) oppure tenendo premuti contemporaneamente i tasti CTRL+Click o SHIFT+Click nella casella di dialogo. Alcuni programmi per la generazione delle immagini, dividono in più parti l'immagine, per consentire una comoda memorizzazione su CD, DVD, o superare le limitazioni del filesystem FAT. Comunque assicuratevi di selezionare tutti i pezzi dell'immagine prima di caricarli con Live View. 
+      </li>
+    </ul>
+    <p class="emphasis">Altrimenti, se desiderate avviare un disco fisico collegato al vostro calcolatore</p>
+  </p>
+  <br/>
+  <img src="images/inputdevice.png"/>
+  <p class="emphasis">
+    scegliete l'opzione "physical disk" tramite l'apposito menù a discesa:
+    <ul>
+      <li>
+		Il disco fisico deve essere connesso direttamente al calcolatore dove gira Live View oppure connesso via USB o FireWire. Meglio usare un writeblocker (per un maggiore livello di protezione del reperto).
+      </li>
+      <p/>
+      <li>
+		Qualora non vedeste il disco da montare nell'elenco delle periferiche proposto dal menù a discesa, assicuratevi che sia collegato correttamente al calcolatore che state usando. Occorre che il disco sia riconosciuto correttamente da Windows e mostri una lettera di periferica corretta..
+      </li>
+    </ul>
+  </p>
+
+  <a name="Step 3 - Select Output Directory"></a>
+  <h3>Step 3 - selezionare la cartella di lavoro</h3>
+  <br/>
+  <img src="images/outputdir.png"/>
+  <p class="emphasis">
+    Scegliete il percorso della cartella di lavoro:
+    <ul>
+      <li>
+		 in questa cartella saranno piazzati i file della macchina virtualizzata, inclusi quelli della configurazione e delle eventuali modifiche apportate all'originale. Questa cartella può essere collocata, come abbiamo detto, sia sul vostro calcolatore che in una condivisione di rete.
+      </li>
+      <p/>
+      <p/>
+      <li>
+		Le dimensioni della macchina virtualizzata cresceranno in funzione delle operazioni svolte, questo perché tutti i processi di scrittura vengono conservati a parte rispetto l'immagine di partenza. È opportuno disporre di spazio a sufficienza laddove collocherete la cartella di lavoro..
+      </li>
+    </ul>
+  </p>
+
+  <a name="Step 4 - Launch or Generate VM"></a>
+  <h3>Step 4 - avviare o creare la macchina virtuale</h3>
+  <br/>
+  <img src="images/inputlaunchorgenerate.png"/>
+  <p class="emphasis">
+    Adesso decidete cosa volete fare con la vostra immagine
+    <ul>
+      <li>
+        Avviare l'immagine:<p/>
+		selezionando questa opzione, Live View andrà a creare la macchina virtualizzata e lancerà VMware.
+      </li>
+      <li>
+        Generare la sola configurazione:<p/>
+		mediante questa opzione, Live View creerà soltanto la macchina virtualizzata ma non la avvierà tramite VMware. In questo modo potrete scegliere quando avviare e da dove, il file con estensione ".vmx".
+      </li>
+    </ul>
+  </p>
+
+  <a name="Step 5 - Click Start"></a>
+  <h3>Step 5 - Cliccare su "Start"</h3>
+  <br/>
+  <img src="images/actionbuttons.png"/>
+  <p class="emphasis">
+    Infine, cliccate sul bottone "Start" e Live View completerà le altre operazioni.
+    <ul>
+      <li>
+		Una finestra dei messaggi vi terrà informati sui progressi. Nella stessa finestra saranno memorizzati eventuali messaggi relativi ad errori incontrati durante il processo di avvio.
+      </li>
+      <p/>
+      <li>
+		Altri messaggi di avviso potrebbero riguardare la creazione di una macchina virtuale "a sola lettura" (nel caso non si stia usando un disco grezzo) oppure perché non è la prima volta che si sta avviando la macchina virtualizzata (e sono quindi state apportate delle modifiche rispetto all'originale - sempre conservate in un file a parte, come si è già detto).
+      </li>
+    </ul>
+  </p>
+
+  <p>
+Traduzione a cura di Calogero Bonasia aka "0disse0"
+  </p>
+
+
+        </section>
