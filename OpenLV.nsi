@@ -10,7 +10,7 @@
 !define BASE_DIRECTORY "${PRODUCT_VERSION}\OpenLV_${PRODUCT_VERSION}_${PRODUCT_EDITION}"
 
 !define PRODUCT_PUBLISHER "OpenLV Dev Team"
-!define PRODUCT_WEB_SITE "http://tvidas.github.io/OpenLV/"
+!define PRODUCT_WEB_SITE "http://www.openlv.org"
 !define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\OpenLV${PRODUCT_EDITION}.jar"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 !define PRODUCT_UNINST_ROOT_KEY "HKLM"
