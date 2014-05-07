@@ -1,0 +1,9 @@
+@article{vidas2014openlv,
+  title={OpenLV: Empowering investigators and first-responders in the digital forensics process},
+  author={Vidas, Timothy and Kaplan, Brian and Geiger, Matthew},
+  journal={Digital Investigation},
+  volume={11},
+  pages={S45--S53},
+  year={2014},
+  publisher={Elsevier}
+}
