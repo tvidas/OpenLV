@@ -3,9 +3,8 @@
 !insertmacro VersionCompare
 
 !define PRODUCT_NAME "OpenLV"
-!define PRODUCT_VERSION "0.0.9"
+!define PRODUCT_VERSION "0.9.2"
 
-;Government or Public
 !define PRODUCT_EDITION "Open"
 !define BASE_DIRECTORY "${PRODUCT_VERSION}\OpenLV_${PRODUCT_VERSION}_${PRODUCT_EDITION}"
 

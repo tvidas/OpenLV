@@ -29,7 +29,7 @@ import java.io.*;
 import javax.swing.*;
 
 import cmu.forensics.mbr.MasterBootRecord;
-import cmu.forensics.registry.RegistryParser;   /*#####Gov#####*/
+import cmu.forensics.registry.RegistryParser;
 import java.awt.*;
 import java.awt.event.*;
 
@@ -66,9 +66,9 @@ import java.util.zip.*;
  *                        
  * It allows you to:      
  *  - Specify the system time (set to time of seizure)
- *  - Dump the sam/system/security hives for password cracking (windows only) #####Gov#####
- *  - Dump the sam and mscash password hashes for password cracking (windows only) #####Gov#####
- *  - Blank out all user account passwords on the system (windows only) #####Gov#####
+ *  - Dump the sam/system/security hives for password cracking (windows only) 
+ *  - Dump the sam and mscash password hashes for password cracking (windows only) 
+ *  - Blank out all user account passwords on the system (windows only)
  *  - Continue working with your changes or start form scratch
  *  - Generate only the configuration files (user launches vmx manually) or automate the launch
  *                        
@@ -80,7 +80,7 @@ import java.util.zip.*;
  * modifications to VM redo, launches the VM, etc 
  * @author Tim Vidas
  * @author Brian Kaplan
- * @version 0.8Beta, Dec 2009
+ * @version 0.9.2
  */
 
 public class OpenLVLauncher 
@@ -160,7 +160,7 @@ public class OpenLVLauncher
      */
     public static void main(String args[])
     {       
-        jarFile = "OpenLVGovernment.jar";  // #####Gov#####
+        jarFile = "OpenLV.jar";
         myLogWriter.log(InternalConfigStrings.getString("OpenLVLauncher.TitleBarText"));
 	thisComputerOS = System.getProperty("os.name");
 	thisComputerSP = System.getProperty("os.version");
@@ -193,7 +193,7 @@ public class OpenLVLauncher
         //maximize to user specified percentage of screen
         int percentWidth  = Integer.parseInt(InternalConfigStrings.getString("OpenLVLauncher.PercentageOfScreenWidth"));
         int percentHeight = Integer.parseInt(InternalConfigStrings.getString("OpenLVLauncher.PercentageOfScreenHeight"));
-        percentHeight+=2;   /*#####Gov#####*/   //this is added to correct the difference in GUI size resulting from removing password/hive functionality
+        percentHeight+=2;   //this is added to correct the difference in GUI size resulting from removing password/hive functionality
 
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
 
@@ -1745,7 +1745,7 @@ public class OpenLVLauncher
                                     //prepare the bootable partition for launch
                                     osArr = prepareVMForLaunch(fullOutVMXPath, fullOutVMDKPath, mountDriveLetter, 
                                             guestOSTypeText, fileSysType, isFullDisk, bootablePartitionIndex,
-                                            clearPasswords, clearDomainPasswords, dumpHives, /*#####Gov#####*/ 
+                                            clearPasswords, clearDomainPasswords, dumpHives,
                                             testDir.getAbsolutePath().trim(), imageName, frame);
 
 			            for(int part =1; part <=4 ; part++){
@@ -1967,7 +1967,7 @@ public class OpenLVLauncher
             inputPanelTop.add(sizeRamPanel);
             inputPanelTop.add(systemTimePanel);
             inputPanelTop.add(osSelectionPanel);
-            inputPanelTop.add(samPanel);   /*#####Gov#####*/ 
+            inputPanelTop.add(samPanel);
 
             JPanel inputPanel = new JPanel(new BorderLayout(0,0));
             inputPanel.add(inputPanelTop);      //all regular input
@@ -2278,16 +2278,16 @@ public class OpenLVLauncher
          *  @param userChosenGuestOS the OS the use selected from the GUI (or auto)
          *  @param fsType the file system type of the partition
          *  @param partitionIndex the partition on the disk to prepare for booting
-         *  @param clearPasswords true if passwords are desired to be blanked   #####Gov#####
-         *  @param clearDomainPasswords true if cached domain passwords are desired to be blanked   #####Gov#####
-         *  @param dumpHives true if the registry hives are desired to be dumped   #####Gov#####
+         *  @param clearPasswords true if passwords are desired to be blanked
+         *  @param clearDomainPasswords true if cached domain passwords are desired to be blanked
+         *  @param dumpHives true if the registry hives are desired to be dumped
          *  @param outputDir the path to create files in (such as a snapshot)
          *  @param baseFileName used for determining the filename of the snapshot file(s)
          *  @return the OperatingSystem instance for partition 'partitionIndex' in the image
          */
         private static OperatingSystem[] prepareVMForLaunch(   String vmxLoc, String vmdkLoc, String mountDriveLetter, 
                 String userChosenGuestOS, String fsType, boolean isFullDisk, int partitionIndexIn,
-                boolean clearPasswords, boolean clearDomainPasswords, boolean dumpHives,  /*#####Gov#####*/
+                boolean clearPasswords, boolean clearDomainPasswords, boolean dumpHives,
                 String outputDir, String baseFileName, JFrame frame)
         {
             boolean autoDetect = userChosenGuestOS.equals("auto");   //did user select auto detect os

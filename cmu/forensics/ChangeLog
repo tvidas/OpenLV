@@ -11,8 +11,8 @@
   Added support for VMWare Workstation 7
   Added user editable Config file (LiveView.ini)
   Added support for secondary disks ("data" disks)
-  Added support for blanking Cached Domain Credentials #####Gov#####
-  Added better password blanking handling (like syskey)#####Gov#####
+  Added support for blanking Cached Domain Credentials
+  Added better password blanking handling (like syskey)
   Increased the number of usuable PhysicalDevices (so LV works with systems
   that have more than 20 devices now)
   Adjusted the way logging is handled (per-use AND permanent)
