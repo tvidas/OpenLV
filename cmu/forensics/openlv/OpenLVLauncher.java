@@ -2105,31 +2105,38 @@ public class OpenLVLauncher
 
 			    ZipOutputStream out = new ZipOutputStream(new FileOutputStream(outFile));
 
+                            String fileErrors = "";
+
 			    for (int i=0; i<filenames.length; i++) {
-				FileInputStream in = new FileInputStream(filenames[i]);
+                                try{
+				   FileInputStream in = new FileInputStream(filenames[i]);
 
-				// this is done so that the full path isn't embedded in the zip
-				File tempFile = new File(filenames[i]);
-				String zipEntName = tempFile.getName();
+				   // this is done so that the full path isn't embedded in the zip
+				   File tempFile = new File(filenames[i]);
+				   String zipEntName = tempFile.getName();
 
-				ZipEntry zEnt = new ZipEntry(zipEntName);
-				//zEnt.setTime()
-				out.putNextEntry(zEnt);
+				   ZipEntry zEnt = new ZipEntry(zipEntName);
+				   //zEnt.setTime()
+				   out.putNextEntry(zEnt);
 
-				int len;
-				while ((len = in.read(buf)) > 0) {
-				    out.write(buf, 0, len);
-				}
-				out.closeEntry();
-				in.close();
+				   int len;
+				   while ((len = in.read(buf)) > 0) {
+				       out.write(buf, 0, len);
+				   }
+				   out.closeEntry();
+				   in.close();
 
-			    }
+			       } catch (Exception e){
+                                   fileErrors = fileErrors + endL + "Zip error with file " + filenames[i] + ": " + e.getMessage();
+                               }
+                           }
 			   out.putNextEntry(new ZipEntry("metainfo"));
 			   out.write(("created: " + formatter.format(new Date()) + endL).getBytes());
 			   out.write(("Name: " + myZipData.getContactName() + endL).getBytes());
 			   out.write(("Email: " + myZipData.getContactEmail() + endL).getBytes());
 			   out.write(("Help: " + myZipData.getHelpMessage() + endL).getBytes());
 			   out.write(thisComputerVersion.getBytes());
+                           out.write((fileErrors + endL).getBytes());
 			   out.closeEntry();
 
 
