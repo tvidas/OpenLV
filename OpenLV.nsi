@@ -6,11 +6,11 @@
 !define PRODUCT_VERSION "0.9.2"
 
 !define PRODUCT_EDITION "Open"
-!define BASE_DIRECTORY "${PRODUCT_VERSION}\OpenLV_${PRODUCT_VERSION}_${PRODUCT_EDITION}"
+!define BASE_DIRECTORY "${PRODUCT_VERSION}\OpenLV_${PRODUCT_VERSION}"
 
 !define PRODUCT_PUBLISHER "OpenLV Dev Team"
 !define PRODUCT_WEB_SITE "http://www.openlv.org"
-!define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\OpenLV${PRODUCT_EDITION}.jar"
+!define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\OpenLV.jar"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 !define PRODUCT_UNINST_ROOT_KEY "HKLM"
 
@@ -54,7 +54,7 @@
 ; Instfiles page
 !insertmacro MUI_PAGE_INSTFILES
 ; Finish page
-;!define MUI_FINISHPAGE_RUN "$SYSDIR\javaw.exe" "-jar $INSTDIR\OpenLV${PRODUCT_EDITION}.jar"
+;!define MUI_FINISHPAGE_RUN "$SYSDIR\javaw.exe" "-jar $INSTDIR\OpenLV.jar"
 !insertmacro MUI_PAGE_FINISH
 
 ; Uninstaller pages
@@ -64,7 +64,7 @@
 !insertmacro MUI_LANGUAGE "English"
 
 Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
-OutFile "OpenLV${PRODUCT_EDITION}Installerv${PRODUCT_VERSION}.exe"
+OutFile "OpenLVInstallerv${PRODUCT_VERSION}.exe"
 InstallDir "$PROGRAMFILES\${PRODUCT_NAME}"
 InstallDirRegKey HKLM "${PRODUCT_DIR_REGKEY}" ""
 ShowInstDetails show
@@ -74,20 +74,20 @@ Section "MainSection" SEC01
 
   Call DetectPreviousInstall
   Call DetectJRE
-  Call DetectVMSoftware
-  Call DetectOldVMWareMount
-  Call DetectVDDK
+;  Call DetectVMSoftware
+;  Call DetectOldVMWareMount
+;  Call DetectVDDK
   
   SetOutPath "$INSTDIR"
   SetOverwrite try
-  File "${BASE_DIRECTORY}\OpenLV${PRODUCT_EDITION}.jar"
+  File "${BASE_DIRECTORY}\OpenLV.jar"
   CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
 
   Call FindJRE
   Pop $R0
 
-  CreateShortCut "$DESKTOP\${PRODUCT_NAME} ${PRODUCT_VERSION}.lnk" $R0 "-jar OpenLV${PRODUCT_EDITION}.jar" "$INSTDIR\Resources\app.ico" 0
-  CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME} ${PRODUCT_VERSION}.lnk" $R0 "-jar OpenLV${PRODUCT_EDITION}.jar" "$INSTDIR\Resources\app.ico" 0
+  CreateShortCut "$DESKTOP\${PRODUCT_NAME} ${PRODUCT_VERSION}.lnk" $R0 "-jar OpenLV.jar" "$INSTDIR\Resources\app.ico" 0
+  CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME} ${PRODUCT_VERSION}.lnk" $R0 "-jar OpenLV.jar" "$INSTDIR\Resources\app.ico" 0
   SetOutPath "$INSTDIR\Resources"
   File "${BASE_DIRECTORY}\Resources\generic.mbr"
   File "${BASE_DIRECTORY}\Resources\genericW98Me.mbr"
@@ -105,7 +105,7 @@ SectionEnd
 
 Section -Post
   WriteUninstaller "$INSTDIR\uninst.exe"
-  WriteRegStr HKLM "${PRODUCT_DIR_REGKEY}" "" "$INSTDIR\OpenLV${PRODUCT_EDITION}.jar"
+  WriteRegStr HKLM "${PRODUCT_DIR_REGKEY}" "" "$INSTDIR\OpenLV.jar"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayName" "$(^Name)"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "UninstallString" "$INSTDIR\uninst.exe"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayIcon" "$INSTDIR\Resources\app.ico"
@@ -353,7 +353,7 @@ Section Uninstall
   Delete "$INSTDIR\Resources\LVSmallIcon.gif"
   Delete "$INSTDIR\Resources\genericW98Me.mbr"
   Delete "$INSTDIR\Resources\generic.mbr"
-  Delete "$INSTDIR\OpenLV${PRODUCT_EDITION}.jar"
+  Delete "$INSTDIR\OpenLV.jar"
 
   Delete "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall.lnk"
   Delete "$SMPROGRAMS\${PRODUCT_NAME}\Website.lnk"
